@@ -7,6 +7,7 @@ toolchain go1.27.2
 require (
 	github.com/spf13/cobra v1.10.2
 	github.com/wailsapp/wails/v2 v2.16.0
+	golang.org/x/net v0.56.0
 )
 
 require (
@@ -37,7 +38,6 @@ require (
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
-	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.39.0 // indirect
 )

@@ -12,3 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation plan and stack/architecture decision record.
 - Project governance, security, and contribution documentation.
 - MIT license.
+- Cobra CLI foundation with deterministic human and JSON version output.
+- Wails v2 desktop shell with Svelte, TypeScript, Tailwind CSS, and a custom app icon.
+- Cross-platform GitHub Actions validation for macOS and Ubuntu, including lint,
+  tests, race detection, frontend checks, and native desktop builds.

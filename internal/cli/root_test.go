@@ -11,7 +11,7 @@ import (
 
 func TestVersionHumanOutput(t *testing.T) {
 	info := buildinfo.Info{Version: "v0.1.0", Commit: "abc123", Date: "2026-10-08T00:00:00Z"}
-	cmd := NewRootCommand(info)
+	cmd := NewRootCommand(info, testDependencies())
 	var output bytes.Buffer
 	cmd.SetOut(&output)
 	cmd.SetArgs([]string{"version"})
@@ -28,7 +28,7 @@ func TestVersionHumanOutput(t *testing.T) {
 
 func TestVersionJSONOutput(t *testing.T) {
 	info := buildinfo.Info{Version: "dev", Commit: "unknown", Date: "unknown"}
-	cmd := NewRootCommand(info)
+	cmd := NewRootCommand(info, testDependencies())
 	var output bytes.Buffer
 	cmd.SetOut(&output)
 	cmd.SetArgs([]string{"version", "--json"})

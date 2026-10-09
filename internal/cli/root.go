@@ -6,22 +6,88 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/addodelgrossi/ovm/internal/app"
 	"github.com/addodelgrossi/ovm/internal/buildinfo"
 	"github.com/spf13/cobra"
 )
 
-// NewRootCommand creates an isolated command tree suitable for execution and tests.
-func NewRootCommand(info buildinfo.Info) *cobra.Command {
+// Dependencies carries the injectable application seams and environment lookup
+// used by the command tree. The zero value is not usable; use Default or
+// construct it explicitly in tests.
+type Dependencies struct {
+	// Discovery performs discovery rounds. Required for the discover command.
+	Discovery app.DiscoveryUseCase
+	// Inventory retrieves device inventories. Required for the info command.
+	Inventory app.InventoryUseCase
+	// LookupEnv resolves environment variables for credential input. A nil
+	// value defaults to os.LookupEnv.
+	LookupEnv func(name string) (string, bool)
+}
+
+// Default returns the production dependencies backed by the real pkg/onvif
+// adapters and the process environment.
+func Default() Dependencies {
+	return Dependencies{
+		Discovery: app.NewProductionDiscovery(),
+		Inventory: app.NewProductionInventory(),
+		LookupEnv: nil,
+	}
+}
+
+// NewRootCommand creates an isolated command tree suitable for execution and
+// tests. The optional rawArgs value enables order-independent JSON failure
+// envelopes when normal flag parsing stops early; process entry points should
+// pass their exact argument slice.
+func NewRootCommand(info buildinfo.Info, deps Dependencies, rawArgs ...[]string) *cobra.Command {
+	var arguments []string
+	if len(rawArgs) > 0 {
+		arguments = rawArgs[0]
+	}
 	root := &cobra.Command{
 		Use:           "ovm",
 		Short:         "Manage and diagnose ONVIF-compatible cameras",
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		// An unknown command is a usage error. Cobra resolves an unknown
+		// subcommand to the root command with the leftover args and then runs
+		// the root's Args validator, so tagging the rejection here maps it to
+		// the usage exit code (2) instead of the generic code.
+		Args: rootUsageArgs,
+		// A bare invocation (no subcommand) is also a usage error rather than a
+		// silent success.
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return markUsageError(fmt.Errorf("a command is required; run \"ovm --help\" for usage"))
+		},
 	}
+
+	// A flag-parsing failure is a usage error. Tagging it here (and inheriting
+	// to subcommands) lets ExitCodeForError map it to the usage exit code.
+	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return markUsageError(err)
+	})
 
 	root.SetOut(io.Discard)
 	root.AddCommand(newVersionCommand(info))
+	root.AddCommand(newDiscoverCommand(deps.Discovery, detectJSONIntent(arguments, "discover", "--iface", "--timeout")))
+	root.AddCommand(newInfoCommand(deps.Inventory, deps.LookupEnv, detectJSONIntent(arguments, "info", "--user", "-u", "--password-env", "--timeout")))
 	return root
+}
+
+// rootUsageArgs rejects an unknown subcommand on the root command, tagging the
+// failure as a usage error. It mirrors Cobra's default subcommand validity
+// check for a root command that has subcommands, but routes the error through
+// the usage classification.
+//
+// The rejected token is deliberately NOT echoed back verbatim. A user who
+// mistypes a command — or who accidentally passes a credential-bearing value as
+// the first positional argument — must not have that raw token reflected into
+// an error string that may reach a terminal, a log, or a CI transcript. The
+// message names only that an unknown command was supplied and how to get help.
+func rootUsageArgs(cmd *cobra.Command, args []string) error {
+	if len(args) > 0 {
+		return markUsageError(fmt.Errorf("unknown command; run %q for usage", cmd.CommandPath()+" --help"))
+	}
+	return nil
 }
 
 func newVersionCommand(info buildinfo.Info) *cobra.Command {
@@ -30,7 +96,7 @@ func newVersionCommand(info buildinfo.Info) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print build version information",
-		Args:  cobra.NoArgs,
+		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if outputJSON {
 				encoder := json.NewEncoder(cmd.OutOrStdout())

@@ -1,0 +1,8 @@
+# Third-Party Notices
+
+This file will list runtime dependencies included in distributed `ovm`
+artifacts, their versions, copyright notices, and licenses.
+
+The authoritative list is generated from locked Go and frontend dependencies
+and then reviewed before each release. Build-only tools that are not distributed
+are documented separately by the release workflow.

@@ -1,6 +1,6 @@
 # ovm v0.1.0 Implementation Plan
 
-Status: **M1 — ONVIF Core and CLI in progress**
+Status: **M2 — Media and Snapshot in progress**
 Last updated: 2026-10-09
 
 ## Product goal
@@ -119,8 +119,8 @@ available and always report method and uncertainty. A result is
 | Milestone | Status | Deliverable | Exit gate |
 |---|---|---|---|
 | M0 Foundation | Complete | Repository, docs, ADR 0001, license, minimal CLI/desktop, CI | Passed locally and in GitHub Actions on macOS/Ubuntu |
-| M1 ONVIF Core + CLI | In progress | SOAP, auth, discovery, Device info, fake device, `discover`/`info` | Fake-device end-to-end workflow |
-| M2 Media | Planned | Media/Media2 reads, URLs, snapshots, `profiles`/`snapshot` | Correct main/substream URLs |
+| M1 ONVIF Core + CLI | Complete | SOAP, auth, discovery, Device info, fake device, `discover`/`info` | Passed locally and in GitHub Actions on macOS/Ubuntu |
+| M2 Media | In progress | Media/Media2 reads, URLs, snapshots, `profiles`/`snapshot` | Correct main/substream URLs |
 | M3 Desktop Base | Planned | Wails UI, persistence, Keychain, sidebar, Overview, Streams, demo | Discover and copy RTSP end to end |
 | M4 Video | Planned | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
 | M5 Configuration | Planned | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soapEnvelope:Envelope xmlns:soapEnvelope="http://www.w3.org/2003/05/soap-envelope">
+  <soapEnvelope:Body>
+    <soapEnvelope:Fault>
+      <soapEnvelope:Code><soapEnvelope:Value>soapEnvelope:VersionMismatch</soapEnvelope:Value></soapEnvelope:Code>
+      <soapEnvelope:Reason><soapEnvelope:Text xml:lang="en">SOAP 1.2 is disabled in this synthetic scenario</soapEnvelope:Text></soapEnvelope:Reason>
+    </soapEnvelope:Fault>
+  </soapEnvelope:Body>
+</soapEnvelope:Envelope>

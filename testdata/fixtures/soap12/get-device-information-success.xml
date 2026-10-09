@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope"
+              xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+  <env:Body>
+    <tds:GetDeviceInformationResponse>
+      <tds:Manufacturer>OVM Synthetic</tds:Manufacturer>
+      <tds:Model>FakeCam 1000</tds:Model>
+      <tds:FirmwareVersion>1.0.0-synthetic</tds:FirmwareVersion>
+      <tds:SerialNumber>SN-SYNTHETIC-0001</tds:SerialNumber>
+      <tds:HardwareId>HW-SYNTHETIC-0001</tds:HardwareId>
+    </tds:GetDeviceInformationResponse>
+  </env:Body>
+</env:Envelope>

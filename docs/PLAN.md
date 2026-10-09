@@ -1,7 +1,7 @@
 # ovm v0.1.0 Implementation Plan
 
 Status: **M1 — ONVIF Core and CLI in progress**
-Last updated: 2026-10-08
+Last updated: 2026-10-09
 
 ## Product goal
 
@@ -148,6 +148,17 @@ available and always report method and uncertainty. A result is
 - Typed Device inventory operations.
 - Interface-aware WS-Discovery, Hello/Bye, and manual endpoint entry.
 - `ovm discover` and `ovm info` with stable JSON output.
+
+Current work (M1 remains **in progress**): the seven typed Device inventory
+operations, separate correlated `tds:Device`/legacy NVT discovery probes,
+passive Hello/Bye lifecycle, manual endpoint handling, `internal/app` boundary,
+production discovery/inventory adapters (Digest + UsernameToken + opt-in Basic),
+and the `discover`/`info` commands are implemented with stable success/failure
+JSON envelopes, a documented exit-code mapping, and credential redaction.
+Evidence is synthetic-fixture only against `internal/fakedevice` and injected
+packet connections; no camera hardware is verified and the remote CI gate for
+M1 is not yet declared passed. The milestone status stays **In progress** until
+remote CI passes.
 
 ### M2 — Media
 

@@ -40,7 +40,7 @@ protocol libraries will use `context.Context` and avoid UI dependencies.
 
 Use Wails v2 while Wails v3 remains prerelease. At the time of this decision:
 
-- Wails v2.14.0 was the latest stable release.
+- Wails v2.16.0 was the latest stable release.
 - Wails v3.0.0-beta.28 was prerelease and therefore ineligible.
 
 Use Svelte 5 with TypeScript and Tailwind CSS 4 for the frontend. The exact

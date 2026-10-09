@@ -132,7 +132,8 @@ available and always report method and uncertainty. A result is
 ### M0 — Foundation
 
 - Add repository/community/security documentation and MIT license.
-- Pin a mutually compatible Go/Wails/Svelte/Tailwind toolchain.
+- Pin a mutually compatible Go/Wails/Svelte/Tailwind toolchain after checking
+  the current stable release feeds (Wails v2.16.0 at M0 implementation time).
 - Create a minimal `ovm version` command with human and JSON output.
 - Create a minimal desktop shell sharing build metadata.
 - Add reproducible formatting, linting, testing, race, frontend, license, and

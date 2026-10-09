@@ -31,7 +31,7 @@ in progress.
 
 - Go 1.27.2
 - Node.js 24 and npm 11 for frontend development
-- Wails v2.14.0 and its platform prerequisites
+- Wails v2.16.0 and its platform prerequisites
 
 Platform-specific desktop dependencies are documented as they are introduced.
 

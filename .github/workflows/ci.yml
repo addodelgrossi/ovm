@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - "dependabot/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-15
+          - ubuntu-22.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      GOTOOLCHAIN: go1.27.2
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.2
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: desktop/frontend/package-lock.json
+
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            pkg-config
+
+      - name: Install frontend dependencies
+        run: make frontend-install
+
+      - name: Run complete validation
+        run: make ci
+
+      - name: Upload CLI artifact
+        if: success()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: ovm-cli-${{ runner.os }}-${{ runner.arch }}
+          path: build/ovm
+          if-no-files-found: error
+
+      - name: Upload desktop artifact
+        if: success()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: ovm-desktop-${{ runner.os }}-${{ runner.arch }}
+          path: desktop/build/bin/
+          if-no-files-found: error

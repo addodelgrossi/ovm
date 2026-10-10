@@ -895,6 +895,34 @@ describe('App M3 integration', () => {
     )
   })
 
+  it('explains why a live preview could not start', async () => {
+    apiMock.bootstrap.mockResolvedValue({
+      data: makeBootstrap(makeOverview(), {
+        demo: false,
+        rtsp_playback_available: false,
+        vlc_available: false,
+        live_preview_available: true
+      })
+    })
+    apiMock.startPreview.mockResolvedValue({
+      error: {
+        category: 'authentication',
+        code: 'operation_authentication',
+        message: 'the camera rejected the stream credentials'
+      }
+    })
+    await renderReady()
+    await fireEvent.click(screen.getByRole('tab', { name: /Streams/ }))
+    await screen.findByRole('heading', { name: 'Profile Main stream' })
+    await fireEvent.click(
+      screen.getAllByRole('button', { name: 'Start live preview' })[0]
+    )
+    const status = await screen.findByText(/The live preview could not start\./)
+    expect(status.textContent).toContain(
+      'Authentication failed. Check the credentials and compatibility policies.'
+    )
+  })
+
   it('exposes labeled controls, live status, modal semantics, and keyboard focus', async () => {
     const empty = makeOverview([], undefined)
     apiMock.bootstrap.mockResolvedValue({ data: makeBootstrap(empty) })

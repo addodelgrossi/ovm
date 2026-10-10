@@ -4,7 +4,7 @@ export type LivePlayerState =
   | { kind: 'connecting' }
   | { kind: 'playing' }
   | { kind: 'ended' }
-  | { kind: 'failed' }
+  | { kind: 'failed'; detail?: string }
   | { kind: 'mse_unavailable' }
   | { kind: 'codec_unsupported'; codec: string }
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
   import { api, type Locale } from '../lib/api'
-  import { t } from '../lib/i18n'
+  import { errorMessage, t } from '../lib/i18n'
   import { LivePlayer, type LivePlayerState } from '../lib/livePlayer'
 
   let {
@@ -31,7 +31,12 @@
       return
     }
     if (!response.data || !video) {
-      playerState = { kind: 'failed' }
+      playerState = {
+        kind: 'failed',
+        detail: response.error
+          ? errorMessage(locale, response.error)
+          : undefined
+      }
       return
     }
     sessionId = response.data.session_id
@@ -63,7 +68,9 @@
       case 'codec_unsupported':
         return t(locale, 'live.codecUnsupported', { codec: state.codec })
       default:
-        return t(locale, 'live.failed')
+        return state.detail
+          ? `${t(locale, 'live.failed')} ${state.detail}`
+          : t(locale, 'live.failed')
     }
   }
 

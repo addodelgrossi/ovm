@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	core "github.com/addodelgrossi/ovm/internal/app"
@@ -22,6 +23,7 @@ type fakeManager struct {
 	overviewFn    func(context.Context) (core.Overview, error)
 	profilesFn    func(context.Context, string) (core.MediaProfilesResult, error)
 	resolveFn     func(context.Context, core.StreamSelection) (string, error)
+	liveFn        func(context.Context, core.StreamSelection) (core.LiveH264Source, error)
 	preferencesFn func(context.Context, core.PreferencesRequest) (core.Overview, error)
 	closeFn       func() error
 }
@@ -132,6 +134,14 @@ func (f *fakeManager) ResolveStreamURI(ctx context.Context, selection core.Strea
 		return f.resolveFn(ctx, selection)
 	}
 	return "", nil
+}
+
+func (f *fakeManager) OpenLiveStream(ctx context.Context, selection core.StreamSelection) (core.LiveH264Source, error) {
+	f.called("live")
+	if f.liveFn != nil {
+		return f.liveFn(ctx, selection)
+	}
+	return nil, errors.New("live stream not configured")
 }
 
 func (f *fakeManager) UpdatePreferences(ctx context.Context, request core.PreferencesRequest) (core.Overview, error) {

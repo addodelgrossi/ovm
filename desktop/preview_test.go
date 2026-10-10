@@ -9,12 +9,57 @@ import (
 	"time"
 
 	core "github.com/addodelgrossi/ovm/internal/app"
+	"github.com/addodelgrossi/ovm/internal/synthmedia"
 	"github.com/addodelgrossi/ovm/pkg/stream"
 )
 
+func syntheticPreviewSources(context.Context, Manager, core.StreamSelection) (stream.H264Source, func(), error) {
+	source, err := synthmedia.NewH264Source(synthmedia.H264Config{Width: 64, Height: 48, FPS: 25, GOP: 25})
+	if err != nil {
+		return nil, nil, err
+	}
+	return synthmedia.NewPacedH264(source), nil, nil
+}
+
+type closingLiveSource struct {
+	stream.H264Source
+	closed chan struct{}
+}
+
+func (c *closingLiveSource) Close() { close(c.closed) }
+
+func TestManagerPreviewSourcesOpensThroughManagerAndReleasesWithClose(t *testing.T) {
+	t.Parallel()
+	inner, _, err := syntheticPreviewSources(context.Background(), nil, core.StreamSelection{})
+	if err != nil {
+		t.Fatalf("synthetic source error = %v", err)
+	}
+	live := &closingLiveSource{H264Source: inner, closed: make(chan struct{})}
+	var got core.StreamSelection
+	manager := newFakeManager()
+	manager.liveFn = func(_ context.Context, selection core.StreamSelection) (core.LiveH264Source, error) {
+		got = selection
+		return live, nil
+	}
+	selection := core.StreamSelection{DeviceID: "device", ProfileToken: "profile", Transport: core.StreamTransportTCP}
+	source, release, err := managerPreviewSources(context.Background(), manager, selection)
+	if err != nil || source == nil || release == nil {
+		t.Fatalf("managerPreviewSources() source=%v release=%t error=%v", source, release != nil, err)
+	}
+	if got != selection {
+		t.Fatalf("selection = %+v, want %+v", got, selection)
+	}
+	release()
+	select {
+	case <-live.closed:
+	default:
+		t.Fatal("release did not close the live source")
+	}
+}
+
 func TestPreviewControllerStreamsDemoSourceAndStops(t *testing.T) {
 	t.Parallel()
-	controller := newPreviewController(demoPreviewSources, []string{wailsPageOrigin})
+	controller := newPreviewController(syntheticPreviewSources, []string{wailsPageOrigin})
 	root, cancelRoot := context.WithCancel(context.Background())
 	defer cancelRoot()
 	selection := core.StreamSelection{DeviceID: "device", ProfileToken: "profile", Transport: core.StreamTransportTCP}
@@ -70,7 +115,7 @@ func TestPreviewControllerEnforcesLimitAndReleasesSources(t *testing.T) {
 	t.Parallel()
 	released := make(chan struct{}, maxConcurrentPreviews+1)
 	factory := func(context.Context, Manager, core.StreamSelection) (stream.H264Source, func(), error) {
-		source, _, err := demoPreviewSources(context.Background(), nil, core.StreamSelection{})
+		source, _, err := syntheticPreviewSources(context.Background(), nil, core.StreamSelection{})
 		return source, func() { released <- struct{}{} }, err
 	}
 	controller := newPreviewController(factory, nil)

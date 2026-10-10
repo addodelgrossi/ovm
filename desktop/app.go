@@ -28,6 +28,7 @@ type Manager interface {
 	Overview(context.Context) (core.Overview, error)
 	Profiles(context.Context, string) (core.MediaProfilesResult, error)
 	ResolveStreamURI(context.Context, core.StreamSelection) (string, error)
+	OpenLiveStream(context.Context, core.StreamSelection) (core.LiveH264Source, error)
 	UpdatePreferences(context.Context, core.PreferencesRequest) (core.Overview, error)
 	Close() error
 }

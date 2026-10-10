@@ -10,7 +10,6 @@ import (
 	core "github.com/addodelgrossi/ovm/internal/app"
 	"github.com/addodelgrossi/ovm/internal/demo"
 	"github.com/addodelgrossi/ovm/internal/store"
-	"github.com/addodelgrossi/ovm/internal/synthmedia"
 	"github.com/addodelgrossi/ovm/pkg/stream"
 )
 
@@ -57,14 +56,15 @@ func productionCompositionFactories() compositionFactories {
 	}
 }
 
-// demoPreviewSources serves the project-owned synthetic H.264 stream in real
-// time for every demo profile; no network or camera is involved.
-func demoPreviewSources(_ context.Context, _ Manager, _ core.StreamSelection) (stream.H264Source, func(), error) {
-	source, err := synthmedia.NewH264Source(synthmedia.H264Config{Width: 640, Height: 352, FPS: 25, GOP: 50})
+// managerPreviewSources opens the selected profile's live RTSP stream through
+// the Manager, which resolves the URI and stored credentials in the backend.
+// In demo mode the Manager points at the loopback synthetic RTSP server.
+func managerPreviewSources(ctx context.Context, manager Manager, selection core.StreamSelection) (stream.H264Source, func(), error) {
+	source, err := manager.OpenLiveStream(ctx, selection)
 	if err != nil {
 		return nil, nil, err
 	}
-	return synthmedia.NewPacedH264(source), nil, nil
+	return source, source.Close, nil
 }
 
 // composeDesktop is the sole production composition root. Normal mode opens
@@ -93,7 +93,7 @@ func composeDesktop(ctx context.Context, options desktopOptions, factories compo
 			Manager:        manager,
 			DemoCloser:     closer,
 			VLC:            launcher,
-			PreviewSources: demoPreviewSources,
+			PreviewSources: managerPreviewSources,
 			Demo:           true,
 		})
 		if err != nil {
@@ -128,11 +128,12 @@ func composeDesktop(ctx context.Context, options desktopOptions, factories compo
 		Discovery:      core.NewProductionDiscovery(),
 		Inventory:      core.NewProductionInventory(),
 		Media:          core.NewProductionMediaProfiles(),
+		LiveStreams:    core.NewProductionLiveStreams(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("compose device manager: %w", err)
 	}
-	host, err := NewApp(AppDependencies{Manager: manager, VLC: launcher})
+	host, err := NewApp(AppDependencies{Manager: manager, VLC: launcher, PreviewSources: managerPreviewSources})
 	if err != nil {
 		if manager != nil {
 			_ = manager.Close()

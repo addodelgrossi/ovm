@@ -32,6 +32,7 @@ type fakeManager struct {
 	applyEncoderFn func(context.Context, string, string, core.EncoderChange) (core.EncoderApplyResult, error)
 	readImagingFn  func(context.Context, string, string) (core.ImagingView, error)
 	applyImagingFn func(context.Context, string, string, core.ImagingSettingsDTO) (core.ImagingApplyResult, error)
+	lastUserChange core.UserChange
 	preferencesFn  func(context.Context, core.PreferencesRequest) (core.Overview, error)
 	closeFn        func() error
 }
@@ -198,6 +199,63 @@ func (f *fakeManager) ApplyImaging(ctx context.Context, deviceID, profileToken s
 		return f.applyImagingFn(ctx, deviceID, profileToken, change)
 	}
 	return core.ImagingApplyResult{}, errors.New("imaging not configured")
+}
+
+func (f *fakeManager) ReadTime(context.Context, string) (core.TimeView, error) {
+	f.called("read_time")
+	return core.TimeView{}, nil
+}
+
+func (f *fakeManager) ApplyTime(context.Context, string, core.TimeChange) (core.TimeApplyResult, error) {
+	f.called("apply_time")
+	return core.TimeApplyResult{}, nil
+}
+
+func (f *fakeManager) ReadUsers(context.Context, string) (core.UsersView, error) {
+	f.called("read_users")
+	return core.UsersView{}, nil
+}
+
+func (f *fakeManager) SetUser(_ context.Context, _ string, change core.UserChange) (core.UsersApplyResult, error) {
+	f.called("set_user")
+	f.lastUserChange = change
+	return core.UsersApplyResult{}, nil
+}
+
+func (f *fakeManager) CreateUser(_ context.Context, _ string, change core.UserChange) (core.UsersApplyResult, error) {
+	f.called("create_user")
+	f.lastUserChange = change
+	return core.UsersApplyResult{}, nil
+}
+
+func (f *fakeManager) DeleteUser(context.Context, string, string) (core.UsersApplyResult, error) {
+	f.called("delete_user")
+	return core.UsersApplyResult{}, nil
+}
+
+func (f *fakeManager) ReadNetwork(context.Context, string) (core.NetworkView, error) {
+	f.called("read_network")
+	return core.NetworkView{}, nil
+}
+
+func (f *fakeManager) ApplyNetwork(context.Context, string, core.NetworkChange) (core.NetworkApplyResult, error) {
+	f.called("apply_network")
+	return core.NetworkApplyResult{}, nil
+}
+
+func (f *fakeManager) Reboot(context.Context, string) (core.MaintenanceResult, error) {
+	f.called("reboot")
+	return core.MaintenanceResult{BackOnline: true}, nil
+}
+
+func (f *fakeManager) SoftFactoryReset(context.Context, string) (core.MaintenanceResult, error) {
+	f.called("factory_reset")
+	return core.MaintenanceResult{BackOnline: true}, nil
+}
+
+func (f *fakeManager) SystemLog(context.Context, string, string) (core.SystemLogResult, error) {
+	f.called("system_log")
+	return core.SystemLogResult{}, nil
 }
 
 func (f *fakeManager) UpdatePreferences(ctx context.Context, request core.PreferencesRequest) (core.Overview, error) {

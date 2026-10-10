@@ -211,6 +211,9 @@ func demoDeviceConfig(urls serviceURLs, username, password string, rtspPort int)
 		RequireUsernameToken: true,
 		Username:             username,
 		Password:             password,
+		// A reboot keeps the demo camera offline for a few seconds, like a
+		// real one.
+		Settings: fakedevice.DeviceSettings{RebootDuration: 3 * time.Second},
 		// Stream URIs point at the demo's loopback synthetic RTSP server, and
 		// the encoder accepts both codecs so encoder changes can be tried.
 		MediaInventory: fakedevice.MediaInventory{

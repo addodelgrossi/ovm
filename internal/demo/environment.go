@@ -124,6 +124,10 @@ func NewEnvironment(ctx context.Context) (*Environment, error) {
 		Probe:          app.NewProductionProbe(),
 		Encoder:        app.NewProductionEncoder(),
 		Imaging:        app.NewProductionImaging(),
+		Time:           app.NewProductionTime(),
+		Users:          app.NewProductionUsers(),
+		Network:        app.NewProductionNetwork(),
+		Maintenance:    app.NewProductionMaintenance(),
 	})
 	if err != nil {
 		_ = camera.Close()

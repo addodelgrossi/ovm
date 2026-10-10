@@ -36,6 +36,17 @@ type Manager interface {
 	ApplyEncoder(context.Context, string, string, core.EncoderChange) (core.EncoderApplyResult, error)
 	ReadImaging(context.Context, string, string) (core.ImagingView, error)
 	ApplyImaging(context.Context, string, string, core.ImagingSettingsDTO) (core.ImagingApplyResult, error)
+	ReadTime(context.Context, string) (core.TimeView, error)
+	ApplyTime(context.Context, string, core.TimeChange) (core.TimeApplyResult, error)
+	ReadUsers(context.Context, string) (core.UsersView, error)
+	SetUser(context.Context, string, core.UserChange) (core.UsersApplyResult, error)
+	CreateUser(context.Context, string, core.UserChange) (core.UsersApplyResult, error)
+	DeleteUser(context.Context, string, string) (core.UsersApplyResult, error)
+	ReadNetwork(context.Context, string) (core.NetworkView, error)
+	ApplyNetwork(context.Context, string, core.NetworkChange) (core.NetworkApplyResult, error)
+	Reboot(context.Context, string) (core.MaintenanceResult, error)
+	SoftFactoryReset(context.Context, string) (core.MaintenanceResult, error)
+	SystemLog(context.Context, string, string) (core.SystemLogResult, error)
 	UpdatePreferences(context.Context, core.PreferencesRequest) (core.Overview, error)
 	Close() error
 }

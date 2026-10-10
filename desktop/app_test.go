@@ -349,3 +349,39 @@ func TestEncoderBindingsValidateAndForwardToTheManager(t *testing.T) {
 		t.Error("ReadEncoder() accepted an empty device ID")
 	}
 }
+
+func TestDeviceConfigurationBindingsRequireConfirmations(t *testing.T) {
+	manager := newFakeManager()
+	app, err := NewApp(AppDependencies{Manager: manager})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	defer app.shutdown(context.Background())
+
+	change := core.NetworkChange{Address: "192.0.2.77", PrefixLength: 24}
+	if response := app.ApplyNetwork(ApplyNetworkRequest{DeviceID: "device-one", Change: change, Confirmation: "192.0.2.78"}); response.Error == nil || manager.callCount("apply_network") != 0 {
+		t.Fatalf("mismatched confirmation reached the manager: %+v", response)
+	}
+	if response := app.ApplyNetwork(ApplyNetworkRequest{DeviceID: "device-one", Change: change, Confirmation: "192.0.2.77"}); response.Error != nil || manager.callCount("apply_network") != 1 {
+		t.Fatalf("confirmed change = %+v", response)
+	}
+	if response := app.ApplyNetwork(ApplyNetworkRequest{DeviceID: "device-one", Change: core.NetworkChange{DHCP: true}, Confirmation: "DHCP"}); response.Error != nil {
+		t.Fatalf("DHCP confirmation = %+v", response)
+	}
+	if response := app.SoftFactoryReset(FactoryResetRequest{DeviceID: "device-one", Confirmation: "reset"}); response.Error == nil || manager.callCount("factory_reset") != 0 {
+		t.Fatalf("lower-case confirmation accepted: %+v", response)
+	}
+	if response := app.SoftFactoryReset(FactoryResetRequest{DeviceID: "device-one", Confirmation: "RESET"}); response.Error != nil || !response.Result.BackOnline {
+		t.Fatalf("confirmed reset = %+v", response)
+	}
+	if response := app.SystemLog(SystemLogRequest{DeviceID: "device-one", Type: "Kernel"}); response.Error == nil {
+		t.Fatal("unknown log type accepted")
+	}
+	if response := app.SetUser(UserChangeRequest{DeviceID: "device-one", Username: "admin", Password: "rotated-secret-9", Level: "Administrator"}); response.Error != nil ||
+		manager.lastUserChange.Password != "rotated-secret-9" {
+		t.Fatalf("SetUser() = %+v", response)
+	}
+	if response := app.CreateUser(UserChangeRequest{DeviceID: "device-one", Username: "bad\nname", Password: "x", Level: "User"}); response.Error == nil {
+		t.Fatal("control character in username accepted")
+	}
+}

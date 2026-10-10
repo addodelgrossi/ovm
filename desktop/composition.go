@@ -136,6 +136,10 @@ func composeDesktop(ctx context.Context, options desktopOptions, factories compo
 		Probe:          core.NewProductionProbe(),
 		Encoder:        core.NewProductionEncoder(),
 		Imaging:        core.NewProductionImaging(),
+		Time:           core.NewProductionTime(),
+		Users:          core.NewProductionUsers(),
+		Network:        core.NewProductionNetwork(),
+		Maintenance:    core.NewProductionMaintenance(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("compose device manager: %w", err)

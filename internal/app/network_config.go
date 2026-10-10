@@ -215,6 +215,8 @@ func (p *productionMedia) ApplyNetwork(ctx context.Context, request DeviceReques
 	}
 
 	target := request
+	// Short probes keep the whole wait inside the caller's budget.
+	target.Timeout = 5 * time.Second
 	if !change.DHCP && change.Address != before.Address {
 		endpoint, err := movedEndpoint(request.Host, change.Address)
 		if err != nil {

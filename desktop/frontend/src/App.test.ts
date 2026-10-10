@@ -884,6 +884,7 @@ describe('App M3 integration', () => {
         frames: 120,
         keyframes: 3,
         lost_packets: 0,
+        reconnects: 1,
         elapsed_ms: 4800,
         first_frame_received: true
       }
@@ -916,6 +917,7 @@ describe('App M3 integration', () => {
     expect(stats.textContent).toContain('1,834 kbps')
     expect(stats.textContent).toContain('50 frames (2.00 s)')
     expect(stats.textContent).toContain('118 ms')
+    expect(stats.textContent).toContain('Reconnects 1')
     expect(apiMock.previewStats).toHaveBeenCalledWith(
       '0123456789abcdef0123456789abcdef'
     )

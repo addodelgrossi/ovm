@@ -153,6 +153,10 @@
           <dt>{t(locale, 'live.statLost')}</dt>
           <dd>{stats.lost_packets}</dd>
         </div>
+        <div>
+          <dt>{t(locale, 'live.statReconnects')}</dt>
+          <dd>{stats.reconnects}</dd>
+        </div>
       </dl>
     {/if}
     {#if playerState}

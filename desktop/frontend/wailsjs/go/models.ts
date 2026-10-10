@@ -1190,6 +1190,7 @@ export namespace main {
     frames: number
     keyframes: number
     lost_packets: number
+    reconnects: number
     elapsed_ms: number
     first_frame_received: boolean
 
@@ -1209,6 +1210,7 @@ export namespace main {
       this.frames = source['frames']
       this.keyframes = source['keyframes']
       this.lost_packets = source['lost_packets']
+      this.reconnects = source['reconnects']
       this.elapsed_ms = source['elapsed_ms']
       this.first_frame_received = source['first_frame_received']
     }

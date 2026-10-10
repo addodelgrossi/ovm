@@ -57,10 +57,13 @@ func productionCompositionFactories() compositionFactories {
 }
 
 // managerPreviewSources opens the selected profile's live RTSP stream through
-// the Manager, which resolves the URI and stored credentials in the backend.
-// In demo mode the Manager points at the loopback synthetic RTSP server.
+// the Manager, which resolves the URI and stored credentials in the backend,
+// and reconnects after failures by re-resolving through the Manager. In demo
+// mode the Manager points at the loopback synthetic RTSP server.
 func managerPreviewSources(ctx context.Context, manager Manager, selection core.StreamSelection) (stream.H264Source, func(), error) {
-	source, err := manager.OpenLiveStream(ctx, selection)
+	source, err := stream.OpenReconnecting(ctx, func(ctx context.Context) (stream.LiveSource, error) {
+		return manager.OpenLiveStream(ctx, selection)
+	}, stream.ReconnectOptions{})
 	if err != nil {
 		return nil, nil, err
 	}

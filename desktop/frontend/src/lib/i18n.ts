@@ -228,6 +228,7 @@ export const en = {
   'live.statGop': 'GOP',
   'live.statFirstFrame': 'First frame',
   'live.statLost': 'Lost packets',
+  'live.statReconnects': 'Reconnects',
   'live.gopValue': '{frames} frames ({seconds} s)',
   'streams.playbackUnavailable': 'RTSP playback is unavailable in this build.',
   'streams.operations': 'Profile operations',
@@ -534,6 +535,7 @@ export const ptBR: Record<TranslationKey, string> = {
   'live.statGop': 'GOP',
   'live.statFirstFrame': 'Primeiro quadro',
   'live.statLost': 'Pacotes perdidos',
+  'live.statReconnects': 'Reconexões',
   'live.gopValue': '{frames} quadros ({seconds} s)',
   'streams.playbackUnavailable':
     'A reprodução RTSP está indisponível nesta compilação.',

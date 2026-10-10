@@ -167,6 +167,7 @@ type PreviewStats struct {
 	Frames                 uint64  `json:"frames"`
 	Keyframes              uint64  `json:"keyframes"`
 	LostPackets            uint64  `json:"lost_packets"`
+	Reconnects             uint64  `json:"reconnects"`
 	ElapsedMillis          int64   `json:"elapsed_ms"`
 	FirstFrameReceived     bool    `json:"first_frame_received"`
 }
@@ -487,6 +488,7 @@ func (a *App) PreviewStats(request PreviewStatsRequest) PreviewStatsResponse {
 		Frames:                 stats.Frames,
 		Keyframes:              stats.Keyframes,
 		LostPackets:            stats.LostPackets,
+		Reconnects:             stats.Reconnects,
 		ElapsedMillis:          stats.Elapsed.Milliseconds(),
 		FirstFrameReceived:     stats.Keyframes > 0,
 	}}

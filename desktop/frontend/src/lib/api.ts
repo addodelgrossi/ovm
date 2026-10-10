@@ -80,6 +80,7 @@ export interface PreviewStats {
   frames: number
   keyframes: number
   lost_packets: number
+  reconnects: number
   elapsed_ms: number
   first_frame_received: boolean
 }

@@ -236,11 +236,21 @@ func decodeServices(root *element, raw []byte) ([]Service, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Validate the advertised XAddr and retain the exact operational value
+		// (path and query preserved) in the unexported field. An unsafe XAddr
+		// (userinfo, fragment, control characters, or an unsupported scheme) is
+		// rejected here rather than stored, so it can never be surfaced or used
+		// downstream. The public XAddr remains the redacted form.
+		operational, xaddrErr := safeOperationalXAddr(xaddr)
+		if xaddrErr != nil {
+			return nil, xaddrErr
+		}
 		service := Service{
-			Namespace:  namespace,
-			XAddr:      soap.RedactURL(xaddr),
-			Version:    ServiceVersion{Major: major, Minor: minor},
-			HasVersion: true,
+			Namespace:        namespace,
+			XAddr:            soap.RedactURL(xaddr),
+			Version:          ServiceVersion{Major: major, Minor: minor},
+			HasVersion:       true,
+			operationalXAddr: operational,
 		}
 		capabilities, capabilitiesErr := optionalElement(entry, Namespace, "Capabilities")
 		if capabilitiesErr != nil {

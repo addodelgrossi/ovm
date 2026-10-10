@@ -56,10 +56,21 @@ type Capabilities struct {
 }
 
 // Service is one entry from GetServices.
+//
+// The advertised service address exists in two forms that must never be
+// confused. XAddr is the credential- and query-redacted form, safe for
+// diagnostics, presentation, logs, JSON, and fmt. The operational form, which
+// retains any path and query required to actually reach the service, is held
+// in an unexported field and is reachable only through the OperationalXAddr
+// accessor at the protocol layer. Keeping the operational value unexported
+// guarantees it can never be serialized by encoding/json or rendered by fmt's
+// struct formatting, so a credential-bearing query cannot leak through a DTO
+// or an error that embeds a Service.
 type Service struct {
 	// Namespace is the service WSDL namespace identifying the service.
 	Namespace string
-	// XAddr is the service endpoint address.
+	// XAddr is the service endpoint address, credential- and query-redacted
+	// for safe diagnostics and presentation.
 	XAddr string
 	// Version is the service version, when present.
 	Version ServiceVersion
@@ -68,7 +79,20 @@ type Service struct {
 	// CapabilitiesXML is bounded, credential-redacted raw XML of the
 	// per-service Capabilities element when present; it is not interpreted here.
 	CapabilitiesXML []byte
+
+	// operationalXAddr is the exact advertised endpoint retaining the full
+	// required path and any RawQuery/ForceQuery needed for actual requests. It
+	// is unexported so it is never serialized by encoding/json or rendered by
+	// fmt; only the OperationalXAddr accessor exposes it, and only to the
+	// protocol layer that constructs requests.
+	operationalXAddr string
 }
+
+// OperationalXAddr returns the exact advertised service endpoint, preserving
+// the full path and any query required to reach the service. Unlike XAddr it is
+// NOT redacted; callers at the protocol boundary use it to build requests and
+// are responsible for never surfacing it in a DTO, an error, or a log line.
+func (s Service) OperationalXAddr() string { return s.operationalXAddr }
 
 // ServiceVersion is a major/minor service version.
 type ServiceVersion struct {

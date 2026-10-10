@@ -279,7 +279,8 @@ func TestGetServices(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetServices() error = %v", err)
 		}
-		if len(services) != 2 || services[0].Namespace == "" || !services[0].HasVersion {
+		if len(services) != 3 || services[0].Namespace == "" || !services[0].HasVersion ||
+			services[2].Namespace != "http://www.onvif.org/ver20/media/wsdl" {
 			t.Errorf("services = %+v", services)
 		}
 	})

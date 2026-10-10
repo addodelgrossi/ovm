@@ -43,6 +43,9 @@ type Device struct {
 	// rebootUntil makes the device unavailable during a simulated reboot.
 	rebootUntil time.Time
 	reboots     int
+	// events holds PullPoint subscriptions; it has its own lock so a waiting
+	// PullMessages never blocks configuration reads.
+	events eventBroker
 }
 
 // New creates a fake device. Configuration maps are copied.
@@ -224,6 +227,10 @@ func (d *Device) dispatch(response http.ResponseWriter, request *http.Request, v
 		d.SetState(stateRequest.Key, stateRequest.Value)
 		d.writeSuccess(response, version, buildSetState(*d.cfg()))
 	default:
+		if handler, ok := extraRequestHandlers[action]; ok {
+			handler(d, response, request, version, operation)
+			return
+		}
 		if handler, ok := extraHandlers[action]; ok {
 			handler(d, response, version, operation)
 			return
@@ -239,6 +246,13 @@ type extraHandler func(d *Device, response http.ResponseWriter, version SOAPVers
 // extraHandlers maps actions to handlers; each file that models operations
 // outside dispatch registers its own in init.
 var extraHandlers = map[string]extraHandler{}
+
+// extraRequestHandler is an extraHandler that also needs the HTTP request,
+// for example to build or resolve an address from the request origin.
+type extraRequestHandler func(d *Device, response http.ResponseWriter, request *http.Request, version SOAPVersion, operation operationWire)
+
+// extraRequestHandlers maps actions to request-aware handlers.
+var extraRequestHandlers = map[string]extraRequestHandler{}
 
 // mutate publishes a modified copy of the configuration. Mutations are
 // serialized so concurrent Set* requests never lose an update.

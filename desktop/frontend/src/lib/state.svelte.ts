@@ -233,6 +233,14 @@ export class AppState {
     if (tab === 'streams' && this.selectedDevice) {
       await this.loadProfiles(this.selectedDevice.id)
     }
+    if (tab === 'live') {
+      // The grid offers every authenticated camera's profiles.
+      await Promise.all(
+        this.overview.devices
+          .filter((device) => device.has_credentials)
+          .map((device) => this.loadProfiles(device.id))
+      )
+    }
   }
 
   async updateLocale(locale: Locale): Promise<void> {

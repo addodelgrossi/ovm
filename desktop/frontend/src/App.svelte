@@ -6,6 +6,7 @@
   import OverviewView from './components/OverviewView.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import StreamsView from './components/StreamsView.svelte'
+  import LiveGridView from './components/LiveGridView.svelte'
   import ToastRegion from './components/ToastRegion.svelte'
   import type { AuthenticateInput, Locale, Tab, Theme } from './lib/api'
   import { errorMessage, t } from './lib/i18n'
@@ -57,6 +58,15 @@
     if (key === '2' && model.selectedDevice) {
       event.preventDefault()
       void model.activateTab('streams')
+      return
+    }
+    if (
+      key === '3' &&
+      model.selectedDevice &&
+      model.capabilities.live_preview_available
+    ) {
+      event.preventDefault()
+      void model.activateTab('live')
     }
   }
 
@@ -236,6 +246,19 @@
             >
               {t(model.locale, 'tabs.streamsShortcut')}
             </button>
+            {#if model.capabilities.live_preview_available}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={model.activeTab === 'live'}
+                aria-controls="live-panel"
+                aria-keyshortcuts="Meta+3 Control+3"
+                class:active={model.activeTab === 'live'}
+                onclick={() => activateTab('live')}
+              >
+                {t(model.locale, 'tabs.liveShortcut')}
+              </button>
+            {/if}
           </nav>
 
           {#if model.activeTab === 'overview'}
@@ -245,6 +268,10 @@
                 device={model.selectedDevice}
                 onAuthenticate={() => (authDialogOpen = true)}
               />
+            </div>
+          {:else if model.activeTab === 'live'}
+            <div id="live-panel" role="tabpanel">
+              <LiveGridView {model} />
             </div>
           {:else}
             <div id="streams-panel" role="tabpanel">

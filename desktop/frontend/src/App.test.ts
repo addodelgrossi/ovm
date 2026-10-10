@@ -37,7 +37,8 @@ const apiMock = vi.hoisted(() => ({
   startPreview: vi.fn(),
   stopPreview: vi.fn(),
   previewStats: vi.fn(),
-  startSnapshotPreview: vi.fn()
+  startSnapshotPreview: vi.fn(),
+  setFullscreen: vi.fn()
 }))
 
 const liveSession = {
@@ -980,6 +981,53 @@ describe('App M3 integration', () => {
 
     await fireEvent.click(screen.getByRole('button', { name: 'Stop preview' }))
     expect(apiMock.stopPreview).toHaveBeenCalledWith(snapshotSession.session_id)
+  })
+
+  it('builds a four-position live grid from authenticated cameras and expands a tile', async () => {
+    const credentialed = [
+      { ...frontCamera, has_credentials: true },
+      { ...garageCamera, has_credentials: true }
+    ]
+    apiMock.bootstrap.mockResolvedValue({
+      data: makeBootstrap(makeOverview(credentialed), {
+        demo: false,
+        rtsp_playback_available: false,
+        vlc_available: false,
+        live_preview_available: true
+      })
+    })
+    render(App)
+    await screen.findByRole('heading', { name: 'Front camera' })
+
+    await fireEvent.click(screen.getByRole('tab', { name: /Live grid/ }))
+    expect(
+      await screen.findByRole('heading', { name: 'Camera grid' })
+    ).toBeTruthy()
+    expect(apiMock.loadProfiles).toHaveBeenCalledWith('camera-front')
+    expect(apiMock.loadProfiles).toHaveBeenCalledWith('camera-garage')
+
+    const chooser = screen.getByLabelText('Stream for position 1')
+    const options = Array.from(
+      (chooser as HTMLSelectElement).options,
+      (option) => option.textContent
+    )
+    expect(options).toContain('Front camera · Main stream')
+    expect(
+      screen.getAllByRole('combobox', { name: /Stream for position/ })
+    ).toHaveLength(4)
+
+    const mainOption = Array.from((chooser as HTMLSelectElement).options).find(
+      (option) => option.textContent === 'Front camera · Main stream'
+    )
+    await fireEvent.change(chooser, { target: { value: mainOption?.value } })
+    expect(
+      await screen.findByRole('button', { name: 'Start live preview' })
+    ).toBeTruthy()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Full screen' }))
+    expect(apiMock.setFullscreen).toHaveBeenCalledWith(true)
+    await fireEvent.keyDown(window, { key: 'Escape' })
+    expect(apiMock.setFullscreen).toHaveBeenCalledWith(false)
   })
 
   it('reports missing MSE when the snapshot fallback is unavailable too', async () => {

@@ -17,11 +17,15 @@ import {
   StopPreview,
   UpdatePreferences
 } from '../../wailsjs/go/main/App.js'
-import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
+import {
+  ClipboardSetText,
+  WindowFullscreen,
+  WindowUnfullscreen
+} from '../../wailsjs/runtime/runtime.js'
 
 export type Locale = 'en' | 'pt-BR'
 export type Theme = 'system' | 'light' | 'dark'
-export type Tab = 'overview' | 'streams'
+export type Tab = 'overview' | 'streams' | 'live'
 export type Transport = 'tcp' | 'udp'
 
 export interface ApiError {
@@ -314,6 +318,7 @@ export interface OvmApi {
     transport: Transport
   ): Promise<ApiResponse<{ completed: boolean }>>
   copyText(text: string): Promise<boolean>
+  setFullscreen(fullscreen: boolean): void
   startPreview(
     deviceId: string,
     profileToken: string
@@ -427,6 +432,14 @@ export const api: OvmApi = {
       return true
     } catch {
       return false
+    }
+  },
+  setFullscreen(fullscreen) {
+    try {
+      if (fullscreen) WindowFullscreen()
+      else WindowUnfullscreen()
+    } catch {
+      // Outside the desktop runtime the expanded tile still fills the window.
     }
   }
 }

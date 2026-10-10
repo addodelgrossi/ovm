@@ -127,6 +127,8 @@ type sessionConfig struct {
 	// negotiation attempt count; a nil clock defers to time.Now.
 	sampler auth.ClockSampler
 	clock   func() time.Time
+	// trace, when set, receives redacted SOAP exchanges with bodies.
+	trace soap.TraceFunc
 }
 
 // newSession builds the single authenticated session for one top-level use
@@ -139,7 +141,7 @@ func newSession(cfg sessionConfig) (*session, error) {
 	if err != nil {
 		return nil, err
 	}
-	soapClient, err := soap.NewClient(soap.Config{HTTPClient: httpClient, Timeout: cfg.timeout})
+	soapClient, err := soap.NewClient(soap.Config{HTTPClient: httpClient, Timeout: cfg.timeout, Trace: cfg.trace, TraceBodies: cfg.trace != nil})
 	if err != nil {
 		return nil, newError(CategoryInternal, "the SOAP client could not be constructed", err)
 	}

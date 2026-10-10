@@ -40,6 +40,8 @@ type productionMedia struct {
 	readbackPolicy *readbackPolicy
 	// clock overrides the local clock used to set and measure camera time.
 	clock func() time.Time
+	// console, when set, receives redacted SOAP exchanges.
+	console *SOAPConsole
 }
 
 // NewProductionMediaProfiles returns the production MediaProfilesUseCase.
@@ -208,6 +210,7 @@ func (p *productionMedia) prepare(host string, timeout time.Duration, creds *Cre
 		baseHTTPClient: p.httpClient,
 		sampler:        auth.ClockSampler{Attempts: negotiationAttempts},
 		clock:          time.Now,
+		trace:          p.console.trace(),
 	})
 	if err != nil {
 		return nil, nil, 0, err

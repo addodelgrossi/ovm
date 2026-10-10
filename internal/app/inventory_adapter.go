@@ -48,6 +48,8 @@ type productionInventory struct {
 	// httpClient is the base HTTP client used for the SOAP transport. A nil
 	// value uses a fresh default client per request.
 	httpClient *http.Client
+	// console, when set, receives redacted SOAP exchanges.
+	console *SOAPConsole
 }
 
 // NewProductionInventory returns the production InventoryUseCase backed by the
@@ -100,6 +102,7 @@ func (p *productionInventory) newSeam(endpointURL string, timeout time.Duration,
 		baseHTTPClient: p.httpClient,
 		sampler:        auth.ClockSampler{Attempts: negotiationAttempts},
 		clock:          time.Now,
+		trace:          p.console.trace(),
 	})
 	if err != nil {
 		return nil, err

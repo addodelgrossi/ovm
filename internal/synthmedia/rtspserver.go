@@ -32,6 +32,8 @@ type RTSPServerConfig struct {
 	// SDPParameterSets advertises the parameter sets in the session description.
 	// Without them a client must wait for the in-band parameter sets.
 	SDPParameterSets bool
+	// EnableUDP also serves RTP/RTCP over UDP on a free loopback port pair.
+	EnableUDP bool
 }
 
 // RTSPServer serves synthetic H.264 and H.265 streams on any path over
@@ -107,12 +109,8 @@ func StartRTSPServer(config RTSPServerConfig) (*RTSPServer, error) {
 	}
 
 	handler := &rtspHandler{config: config}
-	server := &gortsplib.Server{
-		Handler:     handler,
-		RTSPAddress: "127.0.0.1:0",
-		ReadTimeout: 10 * time.Second,
-	}
-	if err := server.Start(); err != nil {
+	server, err := startServer(handler, config.EnableUDP)
+	if err != nil {
 		return nil, err
 	}
 	instance := &RTSPServer{server: server, streams: make(map[string]*gortsplib.ServerStream, len(sources))}
@@ -146,6 +144,50 @@ func StartRTSPServer(config RTSPServerConfig) (*RTSPServer, error) {
 		go instance.pump(ctx, instance.streams[codec], source)
 	}
 	return instance, nil
+}
+
+// startServer binds RTSP on an ephemeral loopback port. With UDP, gortsplib
+// needs an explicit even RTP port and the next port for RTCP, so a free pair
+// is chosen and the bind retried if another process takes it first.
+func startServer(handler *rtspHandler, udp bool) (*gortsplib.Server, error) {
+	attempts := 1
+	if udp {
+		attempts = 20
+	}
+	var lastErr error
+	for attempt := 0; attempt < attempts; attempt++ {
+		server := &gortsplib.Server{
+			Handler:     handler,
+			RTSPAddress: "127.0.0.1:0",
+			ReadTimeout: 10 * time.Second,
+		}
+		if udp {
+			port, err := freeUDPPort()
+			if err != nil {
+				return nil, err
+			}
+			rtp := port &^ 1
+			server.UDPRTPAddress = net.JoinHostPort("127.0.0.1", strconv.Itoa(rtp))
+			server.UDPRTCPAddress = net.JoinHostPort("127.0.0.1", strconv.Itoa(rtp+1))
+		}
+		if lastErr = server.Start(); lastErr == nil {
+			return server, nil
+		}
+	}
+	return nil, lastErr
+}
+
+func freeUDPPort() (int, error) {
+	conn, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = conn.Close() }()
+	address, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return 0, errors.New("synthmedia: unexpected UDP address")
+	}
+	return address.Port, nil
 }
 
 // Port is the bound TCP port.

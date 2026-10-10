@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -147,5 +148,48 @@ func TestTicksToDuration(t *testing.T) {
 	t.Parallel()
 	if got := ticksToDuration(90000*3600 + 45000); got != time.Hour+500*time.Millisecond {
 		t.Fatalf("ticksToDuration() = %v", got)
+	}
+}
+
+func TestRTSPSourcePlaysOverUDP(t *testing.T) {
+	t.Parallel()
+	server := startRTSPServer(t, synthmedia.RTSPServerConfig{EnableUDP: true, SDPParameterSets: true})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	source, err := OpenRTSP(ctx, RTSPOptions{URL: server.URL("/udp"), Transport: TransportUDP})
+	if err != nil {
+		t.Fatalf("OpenRTSP(udp) error = %v", err)
+	}
+	defer source.Close()
+	for i := 0; i < 10; i++ {
+		if _, _, err := source.ReadAccessUnit(ctx); err != nil {
+			t.Fatalf("ReadAccessUnit(%d) over UDP error = %v", i, err)
+		}
+	}
+}
+
+func TestRTSPSourceDoesNotLeakGoroutines(t *testing.T) {
+	server := startRTSPServer(t, synthmedia.RTSPServerConfig{SDPParameterSets: true})
+	settle := func() int {
+		runtime.GC()
+		time.Sleep(200 * time.Millisecond)
+		return runtime.NumGoroutine()
+	}
+	before := settle()
+	for i := 0; i < 5; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		source, err := OpenRTSP(ctx, RTSPOptions{URL: server.URL("/leak")})
+		if err != nil {
+			cancel()
+			t.Fatalf("OpenRTSP(%d) error = %v", i, err)
+		}
+		if _, _, err := source.ReadAccessUnit(ctx); err != nil {
+			t.Fatalf("ReadAccessUnit(%d) error = %v", i, err)
+		}
+		source.Close()
+		cancel()
+	}
+	if after := settle(); after > before+2 {
+		t.Fatalf("goroutines grew from %d to %d across five sessions", before, after)
 	}
 }

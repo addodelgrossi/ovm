@@ -1,14 +1,25 @@
 <script lang="ts">
-  import type { Device } from '../lib/api'
+  import type { Device, MediaProfile } from '../lib/api'
   import { t } from '../lib/i18n'
   import type { AppState } from '../lib/state.svelte'
   import EncoderSettings from './settings/EncoderSettings.svelte'
+  import ImageSettings from './settings/ImageSettings.svelte'
 
   let { model, device }: { model: AppState; device: Device } = $props()
 
   let profiles = $derived(
     model.profilesByDevice[device.id]?.data?.profiles ?? []
   )
+  let chosen = $state('')
+  let profileToken = $derived(
+    profiles.some((profile) => profile.token === chosen)
+      ? chosen
+      : (profiles[0]?.token ?? '')
+  )
+
+  function profileLabel(profile: MediaProfile): string {
+    return profile.name?.trim() || profile.token
+  }
 </script>
 
 <section class="view-stack" aria-labelledby="settings-heading">
@@ -21,12 +32,29 @@
   <p class="safe-url-notice">{t(model.locale, 'settings.verifiedNotice')}</p>
 
   {#if profiles.length > 0}
-    {#key device.id}
+    <label class="field settings-profile">
+      <span>{t(model.locale, 'encoder.profile')}</span>
+      <select
+        value={profileToken}
+        onchange={(event) =>
+          (chosen = (event.currentTarget as HTMLSelectElement).value)}
+      >
+        {#each profiles as profile (profile.token)}
+          <option value={profile.token}>{profileLabel(profile)}</option>
+        {/each}
+      </select>
+    </label>
+    {#key `${device.id}:${profileToken}`}
       <EncoderSettings
         locale={model.locale}
         deviceId={device.id}
-        {profiles}
+        {profileToken}
         onApplied={() => void model.loadProfiles(device.id, true)}
+      />
+      <ImageSettings
+        locale={model.locale}
+        deviceId={device.id}
+        {profileToken}
       />
     {/key}
   {/if}

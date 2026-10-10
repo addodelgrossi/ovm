@@ -1,6 +1,7 @@
 import {
   AddManualDevice,
   ApplyEncoder,
+  ApplyImaging,
   AuthenticateDevice,
   Bootstrap,
   BuildInfo as ReadBuildInfo,
@@ -12,6 +13,7 @@ import {
   OpenInVLC,
   PreviewStats as ReadPreviewStats,
   ReadEncoder,
+  ReadImaging,
   ProbeStream,
   RevealClip,
   Scan,
@@ -180,6 +182,39 @@ export interface EncoderApplyResult {
   profile_token: string
   before: EncoderSettings
   after: EncoderSettings
+  report: MutationReport
+}
+
+export interface ImagingRange {
+  min: number
+  max: number
+}
+
+export interface ImagingSettings {
+  brightness?: number
+  color_saturation?: number
+  contrast?: number
+  sharpness?: number
+  ir_cut_filter?: string
+}
+
+export interface ImagingOptions {
+  brightness?: ImagingRange
+  color_saturation?: ImagingRange
+  contrast?: ImagingRange
+  sharpness?: ImagingRange
+  ir_cut_modes: string[] | null
+}
+
+export interface ImagingView {
+  video_source_token: string
+  settings: ImagingSettings
+  options: ImagingOptions
+}
+
+export interface ImagingApplyResult {
+  before: ImagingSettings
+  after: ImagingSettings
   report: MutationReport
 }
 
@@ -435,6 +470,15 @@ export interface OvmApi {
     durationSeconds: number
   ): Promise<ApiResponse<ProbeResult>>
   revealClip(path: string): Promise<ApiResponse<{ completed: boolean }>>
+  readImaging(
+    deviceId: string,
+    profileToken: string
+  ): Promise<ApiResponse<ImagingView>>
+  applyImaging(
+    deviceId: string,
+    profileToken: string,
+    change: ImagingSettings
+  ): Promise<ApiResponse<ImagingApplyResult>>
   readEncoder(
     deviceId: string,
     profileToken: string
@@ -551,6 +595,20 @@ export const api: OvmApi = {
     invoke<EncoderApplyResult>(() =>
       ApplyEncoder(
         main.ApplyEncoderRequest.createFrom({
+          device_id: deviceId,
+          profile_token: profileToken,
+          change
+        })
+      )
+    ),
+  readImaging: (deviceId, profileToken) =>
+    invoke<ImagingView>(() =>
+      ReadImaging({ device_id: deviceId, profile_token: profileToken })
+    ),
+  applyImaging: (deviceId, profileToken, change) =>
+    invoke<ImagingApplyResult>(() =>
+      ApplyImaging(
+        main.ApplyImagingRequest.createFrom({
           device_id: deviceId,
           profile_token: profileToken,
           change

@@ -44,7 +44,9 @@ const apiMock = vi.hoisted(() => ({
   probeStream: vi.fn(),
   revealClip: vi.fn(),
   readEncoder: vi.fn(),
-  applyEncoder: vi.fn()
+  applyEncoder: vi.fn(),
+  readImaging: vi.fn(),
+  applyImaging: vi.fn()
 }))
 
 const liveSession = {
@@ -1121,7 +1123,67 @@ describe('App M3 integration', () => {
     expect(measurement.textContent).toContain('Complete measurement')
   })
 
+  it('switches IR cut to day and sends only changed image settings', async () => {
+    apiMock.readEncoder.mockResolvedValue({
+      error: { category: 'protocol', code: 'operation_protocol', message: 'x' }
+    })
+    apiMock.readImaging.mockResolvedValue({
+      data: {
+        video_source_token: 'vsrc0',
+        settings: { brightness: 50, contrast: 50, ir_cut_filter: 'AUTO' },
+        options: {
+          brightness: { min: 0, max: 100 },
+          contrast: { min: 0, max: 100 },
+          ir_cut_modes: ['ON', 'OFF', 'AUTO']
+        }
+      }
+    })
+    apiMock.applyImaging.mockResolvedValue({
+      data: {
+        before: { ir_cut_filter: 'AUTO' },
+        after: { brightness: 50, contrast: 50, ir_cut_filter: 'ON' },
+        report: {
+          outcome: 'exact',
+          changes: [
+            {
+              field: 'ir_cut_filter',
+              before: 'AUTO',
+              requested: 'ON',
+              after: 'ON'
+            }
+          ]
+        }
+      }
+    })
+    await renderReady()
+    await fireEvent.click(screen.getByRole('tab', { name: /Settings/ }))
+    const day = await screen.findByRole('radio', { name: 'Day' })
+    expect(
+      (screen.getByRole('radio', { name: 'Auto' }) as HTMLInputElement).checked
+    ).toBe(true)
+    await fireEvent.click(day)
+    const imageSection = screen
+      .getByRole('heading', { name: 'Image' })
+      .closest('section') as HTMLElement
+    await fireEvent.click(
+      within(imageSection).getByRole('button', { name: 'Apply' })
+    )
+    expect(apiMock.applyImaging).toHaveBeenCalledWith(
+      'camera-front',
+      'profile_main',
+      { ir_cut_filter: 'ON' }
+    )
+    expect(
+      await within(imageSection).findByText(
+        'Applied and confirmed by reading it back.'
+      )
+    ).toBeTruthy()
+  })
+
   it('edits the video encoder within the camera options and shows the verified result', async () => {
+    apiMock.readImaging.mockResolvedValue({
+      error: { category: 'protocol', code: 'operation_protocol', message: 'x' }
+    })
     apiMock.readEncoder.mockResolvedValue({
       data: {
         profile_token: 'profile_main',

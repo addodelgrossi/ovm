@@ -684,6 +684,151 @@ export namespace app {
     }
   }
 
+  export class ImagingSettingsDTO {
+    brightness?: number
+    color_saturation?: number
+    contrast?: number
+    sharpness?: number
+    ir_cut_filter?: string
+
+    static createFrom(source: any = {}) {
+      return new ImagingSettingsDTO(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.brightness = source['brightness']
+      this.color_saturation = source['color_saturation']
+      this.contrast = source['contrast']
+      this.sharpness = source['sharpness']
+      this.ir_cut_filter = source['ir_cut_filter']
+    }
+  }
+  export class ImagingApplyResult {
+    before: ImagingSettingsDTO
+    after: ImagingSettingsDTO
+    report: MutationReport
+
+    static createFrom(source: any = {}) {
+      return new ImagingApplyResult(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.before = this.convertValues(source['before'], ImagingSettingsDTO)
+      this.after = this.convertValues(source['after'], ImagingSettingsDTO)
+      this.report = this.convertValues(source['report'], MutationReport)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class ImagingRange {
+    min: number
+    max: number
+
+    static createFrom(source: any = {}) {
+      return new ImagingRange(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.min = source['min']
+      this.max = source['max']
+    }
+  }
+  export class ImagingOptionsDTO {
+    brightness?: ImagingRange
+    color_saturation?: ImagingRange
+    contrast?: ImagingRange
+    sharpness?: ImagingRange
+    ir_cut_modes: string[]
+
+    static createFrom(source: any = {}) {
+      return new ImagingOptionsDTO(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.brightness = this.convertValues(source['brightness'], ImagingRange)
+      this.color_saturation = this.convertValues(
+        source['color_saturation'],
+        ImagingRange
+      )
+      this.contrast = this.convertValues(source['contrast'], ImagingRange)
+      this.sharpness = this.convertValues(source['sharpness'], ImagingRange)
+      this.ir_cut_modes = source['ir_cut_modes']
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+
+  export class ImagingView {
+    video_source_token: string
+    settings: ImagingSettingsDTO
+    options: ImagingOptionsDTO
+
+    static createFrom(source: any = {}) {
+      return new ImagingView(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.video_source_token = source['video_source_token']
+      this.settings = this.convertValues(source['settings'], ImagingSettingsDTO)
+      this.options = this.convertValues(source['options'], ImagingOptionsDTO)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+
   export class MediaOperationStatus {
     operation: string
     state: string
@@ -1119,6 +1264,40 @@ export namespace main {
       return a
     }
   }
+  export class ApplyImagingRequest {
+    device_id: string
+    profile_token: string
+    change: app.ImagingSettingsDTO
+
+    static createFrom(source: any = {}) {
+      return new ApplyImagingRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.device_id = source['device_id']
+      this.profile_token = source['profile_token']
+      this.change = this.convertValues(source['change'], app.ImagingSettingsDTO)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
   export class AuthenticateDeviceRequest {
     device_id: string
     username: string
@@ -1408,6 +1587,70 @@ export namespace main {
     constructor(source: any = {}) {
       if ('string' === typeof source) source = JSON.parse(source)
       this.result = this.convertValues(source['result'], app.EncoderView)
+      this.error = this.convertValues(source['error'], BindingError)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class ImagingApplyResponse {
+    result?: app.ImagingApplyResult
+    error?: BindingError
+
+    static createFrom(source: any = {}) {
+      return new ImagingApplyResponse(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.result = this.convertValues(source['result'], app.ImagingApplyResult)
+      this.error = this.convertValues(source['error'], BindingError)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class ImagingViewResponse {
+    result?: app.ImagingView
+    error?: BindingError
+
+    static createFrom(source: any = {}) {
+      return new ImagingViewResponse(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.result = this.convertValues(source['result'], app.ImagingView)
       this.error = this.convertValues(source['error'], BindingError)
     }
 

@@ -5,8 +5,7 @@
     type EncoderChange,
     type EncoderCodecOptions,
     type EncoderView,
-    type Locale,
-    type MediaProfile
+    type Locale
   } from '../../lib/api'
   import { errorMessage, t } from '../../lib/i18n'
   import MutationResult from './MutationResult.svelte'
@@ -14,16 +13,15 @@
   let {
     locale,
     deviceId,
-    profiles,
+    profileToken,
     onApplied
   }: {
     locale: Locale
     deviceId: string
-    profiles: MediaProfile[]
+    profileToken: string
     onApplied: () => void
   } = $props()
 
-  let profileToken = $state('')
   let view = $state<EncoderView | undefined>()
   let loading = $state(false)
   let applying = $state(false)
@@ -43,10 +41,6 @@
     view?.codecs?.find((option) => option.encoding === form.encoding)
   )
   let resolutionKey = $derived(`${form.width}x${form.height}`)
-
-  $effect(() => {
-    if (!profileToken && profiles.length > 0) profileToken = profiles[0].token
-  })
 
   $effect(() => {
     if (profileToken) void load(profileToken)
@@ -123,23 +117,10 @@
       onApplied()
     }
   }
-
-  function profileLabel(profile: MediaProfile): string {
-    return profile.name?.trim() || profile.token
-  }
 </script>
 
 <section class="settings-section" aria-labelledby="encoder-heading">
   <h3 id="encoder-heading">{t(locale, 'encoder.title')}</h3>
-  <label class="field">
-    <span>{t(locale, 'encoder.profile')}</span>
-    <select bind:value={profileToken}>
-      {#each profiles as profile (profile.token)}
-        <option value={profile.token}>{profileLabel(profile)}</option>
-      {/each}
-    </select>
-  </label>
-
   {#if loading}
     <p class="live-status" role="status">{t(locale, 'settings.loading')}</p>
   {:else if view}

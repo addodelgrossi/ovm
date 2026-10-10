@@ -11,6 +11,10 @@ export function ApplyEncoder(
   arg1: main.ApplyEncoderRequest
 ): Promise<main.EncoderApplyResponse>
 
+export function ApplyImaging(
+  arg1: main.ApplyImagingRequest
+): Promise<main.ImagingApplyResponse>
+
 export function AuthenticateDevice(
   arg1: main.AuthenticateDeviceRequest
 ): Promise<main.AuthenticateDeviceResponse>
@@ -50,6 +54,10 @@ export function ProbeStream(
 export function ReadEncoder(
   arg1: main.EncoderRequest
 ): Promise<main.EncoderViewResponse>
+
+export function ReadImaging(
+  arg1: main.EncoderRequest
+): Promise<main.ImagingViewResponse>
 
 export function RevealClip(
   arg1: main.RevealClipRequest

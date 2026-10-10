@@ -10,6 +10,10 @@ export function ApplyEncoder(arg1) {
   return window['go']['main']['App']['ApplyEncoder'](arg1)
 }
 
+export function ApplyImaging(arg1) {
+  return window['go']['main']['App']['ApplyImaging'](arg1)
+}
+
 export function AuthenticateDevice(arg1) {
   return window['go']['main']['App']['AuthenticateDevice'](arg1)
 }
@@ -56,6 +60,10 @@ export function ProbeStream(arg1) {
 
 export function ReadEncoder(arg1) {
   return window['go']['main']['App']['ReadEncoder'](arg1)
+}
+
+export function ReadImaging(arg1) {
+  return window['go']['main']['App']['ReadImaging'](arg1)
 }
 
 export function RevealClip(arg1) {

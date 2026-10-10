@@ -7,11 +7,13 @@ backend. Protocol libraries are public and UI-independent.
 
 - `cmd/ovm`: CLI composition and process lifecycle.
 - `pkg/onvif`: SOAP, authentication, discovery, typed services, and quirks.
-- `pkg/stream`: RTSP sessions, media statistics, remuxing, and recording.
+- `pkg/stream`: RTSP sessions, media statistics, remuxing, reconnection, and recording.
 - `internal/app`: application use cases and normalized presentation models.
 - `internal/store`: versioned non-secret metadata and secret-provider adapters.
 - `internal/fakedevice`: stateful Device/Media SOAP and authenticated JPEG test services.
 - `internal/demo`: isolated in-memory desktop demo environment built on the fake device.
+- `internal/synthmedia`: project-owned synthetic H.264/H.265 media and a loopback RTSP server.
+- `internal/preview`: token-protected loopback bridge serving previews to the WebView.
 - `desktop`: Wails host, generated bindings, and Svelte frontend.
 
 Dependencies point inward through explicit interfaces. Neither public library
@@ -108,6 +110,36 @@ XML, or UI types.
   marker. This guarantees redaction of credentials in userinfo, query, and
   fragment components; URI paths and opaque identity content are intentionally
   preserved and are not claimed to be secret-free.
+
+## M4 video boundaries
+
+- `pkg/stream` is UI-independent. `VideoSource` yields H.264 or H.265 access
+  units with presentation timestamps; `OpenRTSP` is the production source and
+  `OpenReconnecting` wraps any opener, skipping to the next keyframe after a
+  reconnect and shifting timestamps so the output stays monotonic.
+  `PumpFMP4` drives an `FMP4Muxer` into a `FragmentSink` and republishes the
+  initialization segment when in-band parameter sets change. `Meter` measures
+  encoded payload, not transport overhead, using presentation timestamps.
+- RTSP credentials travel only in the RTSP URL handed to gortsplib inside the
+  backend. Library errors, which can embed URLs, are mapped to typed sentinels
+  with fixed messages.
+- `app.Manager` opens live streams and snapshot feeds by re-resolving the
+  selected profile with stored credentials; the URI and credentials never
+  reach the frontend. `ProbeUseCase` composes profile resolution and the RTSP
+  client for both `ovm probe` and the desktop.
+- `internal/preview` binds `127.0.0.1` on an ephemeral port, requires a
+  256-bit bearer token compared in constant time, rejects foreign Host headers
+  and Origins, answers CORS only for `wails://wails`, bounds every viewer's
+  queue, and disconnects slow viewers without blocking the producer. A late
+  viewer receives the initialization segment and the current group of
+  pictures. Snapshot sessions fetch one validated JPEG per request, serialized
+  per session.
+- The frontend plays the byte stream through Media Source Extensions
+  (`ManagedMediaSource` when present), chases the live edge, trims old buffer,
+  and falls back to authenticated JPEG polling when MSE or the codec is
+  unavailable. Clips are written by the backend to a `0600` temporary file and
+  published with an atomic no-clobber link; they start at a keyframe and stop
+  on a codec change or the 2 GiB limit.
 
 ## M3 desktop boundaries
 

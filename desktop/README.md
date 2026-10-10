@@ -19,10 +19,17 @@ Run the isolated demo with:
 go run . --demo
 ```
 
-Demo mode uses only an in-memory repository, an in-memory secret provider, and
-an in-process camera bound to IPv4 loopback. Its interface list and discovery
-are synthetic and never probe production interfaces or multicast networks.
-Demo capabilities explicitly disable RTSP playback and VLC launch.
+Demo mode uses only an in-memory repository, an in-memory secret provider, an
+in-process camera bound to IPv4 loopback, and an authenticated loopback RTSP
+server that streams a synthetic test pattern (H.265 for the main profile, H.264
+for the others). Its interface list and discovery are synthetic and never probe
+production interfaces or multicast networks. VLC launch is disabled in demo
+mode; live preview, recording, and probing work against the synthetic stream.
+
+Live preview starts a backend session that plays the profile's RTSP stream,
+remuxes it to fragmented MP4, and serves it to the WebView through the
+token-protected loopback bridge in `internal/preview`. Clips are saved to
+`~/Movies/ovm` on macOS and `~/Videos/ovm` elsewhere.
 
 The Wails facade owns a root context and bounds every backend operation. Its
 exported device methods return result/error envelopes with a stable

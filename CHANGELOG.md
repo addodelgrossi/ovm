@@ -112,6 +112,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tabs with credential-free URLs and copy actions; system/light/dark themes;
   English and pt-BR with enforced key parity; and Local Network diagnostics.
 
+- `pkg/stream`: RTSP play sessions for H.264 and H.265 over TCP or UDP with
+  typed, credential-free errors; fragmented MP4 muxing with decode-timestamp
+  extraction; a remux pump that republishes initialization on parameter-set
+  changes; frame-rate, encoded-bitrate, GOP, time-to-first-frame, loss, and
+  reconnect measurements; keyframe-aligned automatic reconnection with
+  continuous timestamps; and atomic, size-bounded clip recording.
+- `internal/preview`: a loopback-only preview bridge with a random bearer
+  token, Host and Origin checks, bounded per-viewer queues, keyframe replay for
+  late viewers, and authenticated JPEG snapshot sessions.
+- Desktop live preview through Media Source Extensions with live statistics,
+  automatic JPEG snapshot fallback (1–5 fps) when the WebView cannot decode the
+  codec, clip recording to `~/Movies/ovm` (macOS) or `~/Videos/ovm`, a
+  four-position live grid with full screen, and a 30-second stream probe.
+- `ovm probe <host>` measures a profile's stream for `--duration` and emits a
+  stable `kind: probe` JSON envelope, keeping partial measurements on failure.
+- `internal/synthmedia`: a lossless, dependency-free synthetic H.264 encoder, a
+  project-owned H.265 fixture, real-time pacing, and an authenticated loopback
+  RTSP server (TCP and optional UDP) used by tests and the demo, whose main
+  profile now streams H.265 and other profiles H.264.
+
 ### Changed
 
 - Presentation RTSP URIs (CLI `profiles`, desktop Streams, copy actions, and VLC
@@ -230,6 +250,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 
 - M0, M1, M2, and M3 are complete, validated locally, in remote CI, and (for
-  M3) in the native app in demo mode. No
+  M3) in the native app in demo mode. M4 is in progress; live preview, both
+  codecs, statistics, and the grid were exercised in the native macOS app in
+  demo mode. No
   physical camera has been verified, and no hardware or conformance claim is
   made.

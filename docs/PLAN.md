@@ -1,6 +1,6 @@
 # ovm v0.1.0 Implementation Plan
 
-Status: **M3 — Desktop Base complete; M4 — Video next**
+Status: **M4 — Video in progress**
 Last updated: 2026-10-10
 
 ## Product goal
@@ -124,7 +124,7 @@ available and always report method and uncertainty. A result is
 | M1 ONVIF Core + CLI | Complete | SOAP, auth, discovery, Device info, fake device, `discover`/`info` | Passed locally and in GitHub Actions on macOS/Ubuntu |
 | M2 Media | Complete | Media/Media2 reads, URLs, snapshots, `profiles`/`snapshot` | Passed locally and in GitHub Actions on macOS/Ubuntu |
 | M3 Desktop Base | Complete | Wails UI, persistence, Keychain, sidebar, Overview, Streams, demo | Discover and copy RTSP end to end |
-| M4 Video | Planned | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
+| M4 Video | In progress | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
 | M5 Configuration | Planned | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |
 | M6 Diagnostics | Planned | SOAP console, Events, clock/stability, reports, Quick Setup, palette | Complete redacted reports |
 | M7 Distribution | Planned/blocked on hardware | macOS/Linux packages, CLI releases, two-camera gate, GitHub release | Physical acceptance and green release workflow |
@@ -204,6 +204,23 @@ guidance and point to manual add; evidence is synthetic-fixture only.
 - MSE Live view, snapshot fallback, fullscreen, and four-camera grid.
 - Keyframe-aligned MP4 clip recording.
 - Stream Probe in desktop and CLI.
+
+Current work: `pkg/stream` provides the RTSP client (gortsplib, TCP/UDP,
+Digest/Basic via the RTSP URL credentials, typed errors), H.264/H.265 fMP4
+muxing with DTS extraction, the remux pump, measurements, keyframe-aligned
+reconnection with continuous timestamps, and atomic clip recording.
+`internal/preview` is the token-protected loopback bridge for fMP4 streams and
+JPEG snapshot sessions. The desktop plays both codecs through MSE in WKWebView
+(verified natively in demo mode on macOS), falls back to adaptive 1–5 fps
+authenticated snapshots when the WebView cannot decode the codec, shows live
+statistics, records clips to the movies folder, offers a four-position grid
+with full screen, and runs 30-second probes; `ovm probe` exposes the same
+measurement in the CLI. The demo serves its main profile as H.265 and others as
+H.264 from an authenticated loopback RTSP server. Evidence is synthetic:
+`internal/synthmedia` generates lossless H.264 and embeds a small project-owned
+H.265 fixture. M4 remains **In progress** until remote CI passes and recording
+and probing are exercised in the native app. Known limits: audio is not
+previewed or recorded; Linux WebKitGTK playback has not been verified natively.
 
 ### M5 — Configuration
 

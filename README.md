@@ -25,12 +25,12 @@ remote cloud access.
 ## Status
 
 See [the implementation plan](docs/PLAN.md) and
-[ADR 0001](docs/adr/0001-stack-and-architecture.md). Milestone M1 (ONVIF core
-and CLI) is complete. Milestone M2 (Media and Snapshot) is **in progress**:
-typed Media1/Media2 clients, normalized profile and snapshot use cases, the
-`profiles` and `snapshot` commands, and the expanded in-process fake device are
-implemented and pass local synthetic-fixture tests. M2 remains in progress until
-remote CI passes. No physical camera has been verified.
+[ADR 0001](docs/adr/0001-stack-and-architecture.md). Milestones M0 (foundation),
+M1 (ONVIF core and CLI), M2 (media and snapshots), and M3 (desktop base) are
+complete. Milestone M4 (video) is **in progress**: RTSP live preview with
+H.264/H.265, measured statistics, reconnection, JPEG fallback, a four-camera
+grid, clip recording, and the `probe` command are implemented and pass local
+and remote synthetic tests. No physical camera has been verified.
 
 ## Commands
 
@@ -57,7 +57,20 @@ ovm snapshot <host> [--profile TOKEN] -o FILE [--force] \
     [-u user] [--password-env NAME] \
     [--allow-basic [--allow-insecure-basic]] [--allow-legacy-digest] \
     [--timeout duration] [--json]
+
+# Measure a profile's RTSP stream for a fixed duration (default 30s).
+ovm probe <host> [--profile TOKEN] [--transport tcp|udp] [--duration 30s] \
+    [-u user] [--password-env NAME] \
+    [--allow-basic [--allow-insecure-basic]] [--allow-legacy-digest] \
+    [--timeout duration] [--json]
 ```
+
+`probe` resolves the profile through ONVIF, plays its H.264 or H.265 RTSP
+stream with the same credentials, and reports codec, resolution, frame rate,
+encoded bitrate (video payload only), GOP, time to first frame (including the
+connection), keyframes, and RTP loss. Rates use the camera's presentation
+timestamps. When the stream ends early or the command is cancelled, the
+partial measurement is still reported together with the categorized error.
 
 The host-scoped commands accept a host, `host:port`, or full `http(s)://` Device
 service URL. `profiles` reports every profile in deterministic token order,
@@ -82,7 +95,7 @@ atomic replacement; errors and cancellation leave no partial output.
 
 `info` human output includes operation support, identity, time, hostname,
 capability/service endpoints, scopes, and network interfaces. Machine output
-for `discover`, `info`, `profiles`, and `snapshot` uses a stable
+for `discover`, `info`, `profiles`, `snapshot`, and `probe` uses a stable
 `schema_version: 1` typed envelope; runtime and validation failures retain the
 command's envelope with a safe categorized `error` object and return a nonzero
 exit code.

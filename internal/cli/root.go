@@ -23,6 +23,8 @@ type Dependencies struct {
 	MediaProfiles app.MediaProfilesUseCase
 	// Snapshot retrieves one JPEG atomically. Required for snapshot.
 	Snapshot app.SnapshotUseCase
+	// Probe measures a stream for a fixed duration. Required for probe.
+	Probe app.ProbeUseCase
 	// LookupEnv resolves environment variables for credential input. A nil
 	// value defaults to os.LookupEnv.
 	LookupEnv func(name string) (string, bool)
@@ -36,6 +38,7 @@ func Default() Dependencies {
 		Inventory:     app.NewProductionInventory(),
 		MediaProfiles: app.NewProductionMediaProfiles(),
 		Snapshot:      app.NewProductionSnapshot(),
+		Probe:         app.NewProductionProbe(),
 		LookupEnv:     nil,
 	}
 }
@@ -77,6 +80,7 @@ func NewRootCommand(info buildinfo.Info, deps Dependencies, rawArgs ...[]string)
 	root.AddCommand(newDiscoverCommand(deps.Discovery, detectJSONIntent(arguments, "discover", "--iface", "--timeout")))
 	root.AddCommand(newInfoCommand(deps.Inventory, deps.LookupEnv, detectJSONIntent(arguments, "info", "--user", "-u", "--password-env", "--timeout")))
 	root.AddCommand(newProfilesCommand(deps.MediaProfiles, deps.LookupEnv, detectJSONIntent(arguments, "profiles", "--user", "-u", "--password-env", "--timeout")))
+	root.AddCommand(newProbeCommand(deps.Probe, deps.LookupEnv, detectJSONIntent(arguments, "probe", "--user", "-u", "--password-env", "--profile", "--transport", "--duration", "--timeout")))
 	root.AddCommand(newSnapshotCommand(deps.Snapshot, deps.LookupEnv, detectJSONIntent(arguments, "snapshot", "--user", "-u", "--password-env", "--profile", "--output", "-o", "--timeout")))
 	return root
 }

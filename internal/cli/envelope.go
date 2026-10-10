@@ -13,6 +13,7 @@ const (
 	kindInventory = "inventory"
 	kindProfiles  = "profiles"
 	kindSnapshot  = "snapshot"
+	kindProbe     = "probe"
 )
 
 // discoveryEnvelope is the stable JSON envelope for discover output. Fields are
@@ -91,6 +92,24 @@ func newSnapshotEnvelope(result app.SnapshotMetadata) snapshotEnvelope {
 
 func newSnapshotFailureEnvelope(result app.SnapshotMetadata, err error) snapshotEnvelope {
 	envelope := newSnapshotEnvelope(result)
+	envelope.Error = newErrorEnvelope(err)
+	return envelope
+}
+
+// probeEnvelope is the stable JSON envelope for stream measurements.
+type probeEnvelope struct {
+	SchemaVersion int             `json:"schema_version"`
+	Kind          string          `json:"kind"`
+	Result        app.ProbeResult `json:"result"`
+	Error         *errorEnvelope  `json:"error,omitempty"`
+}
+
+func newProbeEnvelope(result app.ProbeResult) probeEnvelope {
+	return probeEnvelope{SchemaVersion: schemaVersion, Kind: kindProbe, Result: result}
+}
+
+func newProbeFailureEnvelope(result app.ProbeResult, err error) probeEnvelope {
+	envelope := newProbeEnvelope(result)
 	envelope.Error = newErrorEnvelope(err)
 	return envelope
 }

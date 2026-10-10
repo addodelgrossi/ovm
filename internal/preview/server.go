@@ -30,7 +30,11 @@ const (
 	// viewer. A larger GOP is not replayed; the viewer waits for a keyframe.
 	maxReplayBytes = 16 << 20
 
-	sessionPathPrefix = "/v1/sessions/"
+	sessionPathPrefix  = "/v1/sessions/"
+	snapshotPathPrefix = "/v1/snapshots/"
+
+	// snapshotFetchTimeout bounds one camera snapshot request.
+	snapshotFetchTimeout = 10 * time.Second
 )
 
 // ErrClosed reports use of a closed server or session.
@@ -44,9 +48,10 @@ type Server struct {
 	host     string
 	origins  map[string]struct{}
 
-	mu       sync.Mutex
-	sessions map[string]*Session
-	closed   bool
+	mu        sync.Mutex
+	sessions  map[string]*Session
+	snapshots map[string]*SnapshotSession
+	closed    bool
 }
 
 // NewServer starts a bridge that answers CORS requests only from the given
@@ -61,11 +66,12 @@ func NewServer(allowedOrigins []string) (*Server, error) {
 		return nil, err
 	}
 	server := &Server{
-		listener: listener,
-		token:    token,
-		host:     listener.Addr().String(),
-		origins:  make(map[string]struct{}, len(allowedOrigins)),
-		sessions: make(map[string]*Session),
+		listener:  listener,
+		token:     token,
+		host:      listener.Addr().String(),
+		origins:   make(map[string]struct{}, len(allowedOrigins)),
+		sessions:  make(map[string]*Session),
+		snapshots: make(map[string]*SnapshotSession),
 	}
 	for _, origin := range allowedOrigins {
 		server.origins[origin] = struct{}{}
@@ -120,6 +126,7 @@ func (s *Server) Close(ctx context.Context) error {
 	for _, session := range s.sessions {
 		sessions = append(sessions, session)
 	}
+	s.snapshots = make(map[string]*SnapshotSession)
 	s.mu.Unlock()
 	for _, session := range sessions {
 		session.Close()
@@ -159,6 +166,17 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	if id, ok := strings.CutPrefix(r.URL.Path, snapshotPathPrefix); ok {
+		s.mu.Lock()
+		snapshot := s.snapshots[id]
+		s.mu.Unlock()
+		if snapshot == nil {
+			http.NotFound(w, r)
+			return
+		}
+		snapshot.serve(w, r)
+		return
+	}
 	id, ok := strings.CutPrefix(r.URL.Path, sessionPathPrefix)
 	if !ok {
 		http.NotFound(w, r)
@@ -172,6 +190,70 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session.serve(w, r)
+}
+
+// NewSnapshotSession registers a JPEG fallback source. Each request fetches a
+// fresh image; concurrent requests for one session are serialized so a
+// viewer cannot multiply load on the camera.
+func (s *Server) NewSnapshotSession(fetch func(context.Context) ([]byte, error)) (*SnapshotSession, error) {
+	id, err := randomHex(16)
+	if err != nil {
+		return nil, err
+	}
+	snapshot := &SnapshotSession{id: id, fetch: fetch}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil, ErrClosed
+	}
+	s.snapshots[id] = snapshot
+	snapshot.unregister = func() {
+		s.mu.Lock()
+		delete(s.snapshots, id)
+		s.mu.Unlock()
+	}
+	return snapshot, nil
+}
+
+// SnapshotSession serves the JPEG preview fallback for one profile.
+type SnapshotSession struct {
+	id         string
+	fetch      func(context.Context) ([]byte, error)
+	unregister func()
+	serial     sync.Mutex
+	once       sync.Once
+}
+
+// ID is the session identifier used in the snapshot path.
+func (s *SnapshotSession) ID() string { return s.id }
+
+// Path is the request path for this session.
+func (s *SnapshotSession) Path() string { return snapshotPathPrefix + s.id }
+
+// Close unregisters the session. It is idempotent.
+func (s *SnapshotSession) Close() {
+	s.once.Do(func() {
+		if s.unregister != nil {
+			s.unregister()
+		}
+	})
+}
+
+func (s *SnapshotSession) serve(w http.ResponseWriter, r *http.Request) {
+	s.serial.Lock()
+	defer s.serial.Unlock()
+	ctx, cancel := context.WithTimeout(r.Context(), snapshotFetchTimeout)
+	defer cancel()
+	image, err := s.fetch(ctx)
+	if err != nil {
+		http.Error(w, "snapshot unavailable", http.StatusBadGateway)
+		return
+	}
+	header := w.Header()
+	header.Set("Content-Type", "image/jpeg")
+	header.Set("Cache-Control", "no-store")
+	header.Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write(image)
 }
 
 // Session is one published preview stream. The producer calls SetInit before

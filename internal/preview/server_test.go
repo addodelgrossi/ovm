@@ -240,3 +240,37 @@ func waitForViewers(t *testing.T, session *Session, want int) {
 		time.Sleep(5 * time.Millisecond)
 	}
 }
+
+func TestSnapshotSessionServesFreshImagesWithTheSameProtections(t *testing.T) {
+	t.Parallel()
+	server := newTestServer(t)
+	calls := 0
+	snapshot, err := server.NewSnapshotSession(func(context.Context) ([]byte, error) {
+		calls++
+		if calls == 3 {
+			return nil, errors.New("camera unavailable")
+		}
+		return []byte{0xFF, 0xD8, byte(calls), 0xFF, 0xD9}, nil
+	})
+	if err != nil {
+		t.Fatalf("NewSnapshotSession() error = %v", err)
+	}
+	for want := 1; want <= 2; want++ {
+		response := request(t, server, http.MethodGet, snapshot.Path(), nil) //nolint:bodyclose // request closes the body in t.Cleanup
+		body, _ := io.ReadAll(response.Body)
+		if response.StatusCode != http.StatusOK || response.Header.Get("Content-Type") != "image/jpeg" || body[2] != byte(want) {
+			t.Fatalf("fetch %d: status=%d type=%q body=% x", want, response.StatusCode, response.Header.Get("Content-Type"), body)
+		}
+	}
+	if response := request(t, server, http.MethodGet, snapshot.Path(), nil); response.StatusCode != http.StatusBadGateway { //nolint:bodyclose // request closes the body in t.Cleanup
+		t.Fatalf("failed fetch status = %d, want 502", response.StatusCode)
+	}
+	unauthorized := request(t, server, http.MethodGet, snapshot.Path(), func(r *http.Request) { r.Header.Del("Authorization") }) //nolint:bodyclose // request closes the body in t.Cleanup
+	if unauthorized.StatusCode != http.StatusUnauthorized || calls != 3 {
+		t.Fatalf("unauthorized status = %d, calls = %d", unauthorized.StatusCode, calls)
+	}
+	snapshot.Close()
+	if response := request(t, server, http.MethodGet, snapshot.Path(), nil); response.StatusCode != http.StatusNotFound { //nolint:bodyclose // request closes the body in t.Cleanup
+		t.Fatalf("closed session status = %d, want 404", response.StatusCode)
+	}
+}

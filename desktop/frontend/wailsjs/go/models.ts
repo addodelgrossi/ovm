@@ -1410,6 +1410,18 @@ export namespace main {
     }
   }
 
+  export class RevealClipRequest {
+    path: string
+
+    static createFrom(source: any = {}) {
+      return new RevealClipRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.path = source['path']
+    }
+  }
   export class ScanRequest {
     interface_name: string
     timeout_milliseconds: number

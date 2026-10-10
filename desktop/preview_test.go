@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -257,5 +258,58 @@ func TestPreviewControllerRecordsKeyframeAlignedClips(t *testing.T) {
 	defer cancel()
 	if err := controller.close(closeCtx); err != nil {
 		t.Fatalf("close() error = %v", err)
+	}
+}
+
+type recordingStarter struct {
+	executable string
+	arguments  []string
+}
+
+func (r *recordingStarter) Start(_ context.Context, executable string, arguments []string) error {
+	r.executable, r.arguments = executable, arguments
+	return nil
+}
+
+func TestRevealClipAcceptsOnlyExistingClipsInTheClipFolder(t *testing.T) {
+	t.Parallel()
+	directory := t.TempDir()
+	clip := filepath.Join(directory, "ovm-profile_main-20261010-120000.000.mp4")
+	if err := os.WriteFile(clip, []byte("clip"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	other := filepath.Join(directory, "notes.txt")
+	if err := os.WriteFile(other, []byte("x"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	app, err := NewApp(AppDependencies{Manager: newFakeManager()})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	defer app.shutdown(context.Background())
+	starter := &recordingStarter{}
+	app.files = starter
+	app.previews.clipDir = func() (string, error) { return directory, nil }
+
+	response := app.RevealClip(RevealClipRequest{Path: clip})
+	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+		if response.Error != nil || starter.executable == "" {
+			t.Fatalf("RevealClip(clip) = %+v, starter = %+v", response, starter)
+		}
+		if runtime.GOOS == "darwin" && (starter.executable != "/usr/bin/open" || starter.arguments[0] != "-R" || starter.arguments[1] != clip) {
+			t.Fatalf("darwin command = %s %v", starter.executable, starter.arguments)
+		}
+	}
+	for _, path := range []string{
+		"", "relative.mp4", other,
+		filepath.Join(directory, "ovm-missing.mp4"),
+		filepath.Join(directory, "..", filepath.Base(directory), "..", "ovm-escape.mp4"),
+		"/etc/hosts",
+		directory,
+	} {
+		starter.executable = ""
+		if response := app.RevealClip(RevealClipRequest{Path: path}); response.Error == nil || starter.executable != "" {
+			t.Errorf("RevealClip(%q) = %+v, started %q", path, response, starter.executable)
+		}
 	}
 }

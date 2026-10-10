@@ -15,6 +15,8 @@ import (
 var (
 	errRecordingActive   = errors.New("a recording is already running")
 	errRecordingInactive = errors.New("no recording is running")
+	errClipPath          = errors.New("the clip path is not valid")
+	errRevealUnsupported = errors.New("revealing files is not supported on this platform")
 )
 
 // previewSink feeds the loopback bridge and, while recording, a clip. It keeps
@@ -119,4 +121,39 @@ func clipFileName(profileToken string, now time.Time) string {
 		name = "stream"
 	}
 	return "ovm-" + name + "-" + now.Format("20060102-150405.000") + ".mp4"
+}
+
+// validateClipPath accepts only an existing regular ovm clip file directly
+// inside the clip folder, so a frontend-supplied path can never select an
+// arbitrary file or directory.
+func validateClipPath(directory, path string) (string, error) {
+	if path == "" || !filepath.IsAbs(path) || strings.ContainsAny(path, "\x00\r\n") {
+		return "", errClipPath
+	}
+	clean := filepath.Clean(path)
+	if filepath.Dir(clean) != filepath.Clean(directory) {
+		return "", errClipPath
+	}
+	name := filepath.Base(clean)
+	if !strings.HasPrefix(name, "ovm-") || !strings.HasSuffix(name, ".mp4") {
+		return "", errClipPath
+	}
+	info, err := os.Lstat(clean)
+	if err != nil || !info.Mode().IsRegular() {
+		return "", errClipPath
+	}
+	return clean, nil
+}
+
+// revealCommand selects the platform file manager. macOS selects the file in
+// Finder; Linux opens the containing folder.
+func revealCommand(goos, path string) (string, []string, error) {
+	switch goos {
+	case "darwin":
+		return "/usr/bin/open", []string{"-R", path}, nil
+	case "linux":
+		return "/usr/bin/xdg-open", []string{filepath.Dir(path)}, nil
+	default:
+		return "", nil, errRevealUnsupported
+	}
 }

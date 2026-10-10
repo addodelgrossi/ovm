@@ -242,6 +242,10 @@ export const en = {
   'record.savedInterrupted':
     'Clip saved to {path} ({size} MB). Recording stopped early because the stream changed, ended, or reached the size limit.',
   'record.failed': 'The clip could not be saved.',
+  'record.copyPath': 'Copy path',
+  'record.pathCopied': 'Path copied',
+  'record.reveal': 'Show in folder',
+  'record.revealFailed': 'The folder could not be opened.',
   'grid.eyebrow': 'Live view',
   'grid.title': 'Camera grid',
   'grid.hint':
@@ -580,6 +584,10 @@ export const ptBR: Record<TranslationKey, string> = {
   'record.savedInterrupted':
     'Clipe salvo em {path} ({size} MB). A gravação parou antes porque a transmissão mudou, terminou ou atingiu o limite de tamanho.',
   'record.failed': 'Não foi possível salvar o clipe.',
+  'record.copyPath': 'Copiar caminho',
+  'record.pathCopied': 'Caminho copiado',
+  'record.reveal': 'Mostrar na pasta',
+  'record.revealFailed': 'Não foi possível abrir a pasta.',
   'grid.eyebrow': 'Visualização ao vivo',
   'grid.title': 'Grade de câmeras',
   'grid.hint':

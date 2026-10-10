@@ -41,7 +41,8 @@ const apiMock = vi.hoisted(() => ({
   setFullscreen: vi.fn(),
   startRecording: vi.fn(),
   stopRecording: vi.fn(),
-  probeStream: vi.fn()
+  probeStream: vi.fn(),
+  revealClip: vi.fn()
 }))
 
 const liveSession = {
@@ -967,6 +968,21 @@ describe('App M3 integration', () => {
         'Clip saved to /Users/tester/Movies/ovm/ovm-profile_main.mp4 (2.5 MB).'
       )
     ).toBeTruthy()
+    apiMock.copyText.mockResolvedValue(true)
+    apiMock.revealClip.mockResolvedValue({ data: { completed: true } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Copy path' }))
+    expect(apiMock.copyText).toHaveBeenCalledWith(
+      '/Users/tester/Movies/ovm/ovm-profile_main.mp4'
+    )
+    expect(
+      await screen.findByRole('button', { name: 'Path copied' })
+    ).toBeTruthy()
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Show in folder' })
+    )
+    expect(apiMock.revealClip).toHaveBeenCalledWith(
+      '/Users/tester/Movies/ovm/ovm-profile_main.mp4'
+    )
 
     await fireEvent.click(screen.getByRole('button', { name: 'Stop preview' }))
     expect(apiMock.stopPreview).toHaveBeenCalledWith(liveSession.session_id)

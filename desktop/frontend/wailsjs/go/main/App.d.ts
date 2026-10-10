@@ -43,6 +43,10 @@ export function ProbeStream(
   arg1: main.ProbeStreamRequest
 ): Promise<main.ProbeStreamResponse>
 
+export function RevealClip(
+  arg1: main.RevealClipRequest
+): Promise<main.ActionResponse>
+
 export function Scan(arg1: main.ScanRequest): Promise<main.ScanResponse>
 
 export function SelectDevice(

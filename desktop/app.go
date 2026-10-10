@@ -67,7 +67,9 @@ type App struct {
 	demoCloser LifecycleCloser
 	vlc        VLCLauncher
 	previews   *previewController
-	caps       CapabilityFlags
+	// files starts the platform file manager for RevealClip.
+	files processStarter
+	caps  CapabilityFlags
 
 	callTimeout     time.Duration
 	shutdownTimeout time.Duration
@@ -111,6 +113,7 @@ func NewApp(deps AppDependencies) (*App, error) {
 		demoCloser: deps.DemoCloser,
 		vlc:        deps.VLC,
 		previews:   previews,
+		files:      commandProcessStarter{},
 		caps: CapabilityFlags{
 			Demo:                  deps.Demo,
 			RTSPPlaybackAvailable: vlcAvailable,

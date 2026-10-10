@@ -50,6 +50,10 @@ export function ProbeStream(arg1) {
   return window['go']['main']['App']['ProbeStream'](arg1)
 }
 
+export function RevealClip(arg1) {
+  return window['go']['main']['App']['RevealClip'](arg1)
+}
+
 export function Scan(arg1) {
   return window['go']['main']['App']['Scan'](arg1)
 }

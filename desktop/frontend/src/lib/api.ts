@@ -11,6 +11,7 @@ import {
   OpenInVLC,
   PreviewStats as ReadPreviewStats,
   ProbeStream,
+  RevealClip,
   Scan,
   SelectDevice,
   StartPreview,
@@ -362,6 +363,7 @@ export interface OvmApi {
     transport: Transport,
     durationSeconds: number
   ): Promise<ApiResponse<ProbeResult>>
+  revealClip(path: string): Promise<ApiResponse<{ completed: boolean }>>
   startRecording(sessionId: string): Promise<ApiResponse<RecordingResult>>
   stopRecording(sessionId: string): Promise<ApiResponse<RecordingResult>>
 }
@@ -461,6 +463,8 @@ export const api: OvmApi = {
         duration_seconds: durationSeconds
       })
     ),
+  revealClip: (path) =>
+    invoke<{ completed: boolean }>(() => RevealClip({ path })),
   startRecording: (sessionId) =>
     invoke<RecordingResult>(() => StartRecording({ session_id: sessionId })),
   stopRecording: (sessionId) =>

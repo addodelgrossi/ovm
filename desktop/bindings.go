@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"runtime"
 	"time"
 
 	core "github.com/addodelgrossi/ovm/internal/app"
@@ -576,6 +577,37 @@ func (a *App) StopRecording(request RecordingRequest) RecordingResponse {
 	return RecordingResponse{Result: result}
 }
 
+type RevealClipRequest struct {
+	Path string `json:"path"`
+}
+
+// RevealClip shows a saved clip in the platform file manager. Only existing
+// ovm clips inside the clip folder are accepted; no shell is involved.
+func (a *App) RevealClip(request RevealClipRequest) ActionResponse {
+	a.mu.Lock()
+	previews, files := a.previews, a.files
+	a.mu.Unlock()
+	if previews == nil || files == nil {
+		return ActionResponse{Error: bindingUnavailable("app_closed", "the desktop application is closed")}
+	}
+	directory, err := previews.clipDir()
+	if err != nil {
+		return ActionResponse{Error: bindingErrorFrom(errClipPath)}
+	}
+	path, err := validateClipPath(directory, request.Path)
+	if err != nil {
+		return ActionResponse{Error: bindingErrorFrom(err)}
+	}
+	executable, arguments, err := revealCommand(runtime.GOOS, path)
+	if err != nil {
+		return ActionResponse{Error: bindingErrorFrom(err)}
+	}
+	if err := files.Start(context.Background(), executable, arguments); err != nil {
+		return ActionResponse{Error: bindingUnavailable("reveal_failed", "the file manager could not be opened")}
+	}
+	return ActionResponse{Result: &ActionResult{Completed: true}}
+}
+
 // PreviewStats returns live measurements for an active preview.
 func (a *App) PreviewStats(request PreviewStatsRequest) PreviewStatsResponse {
 	if !validPreviewSessionID(request.SessionID) {
@@ -622,6 +654,10 @@ func bindingErrorFrom(err error) *BindingError {
 		return &BindingError{Category: core.CategoryUsage, Code: "recording_active", Message: "a recording is already running"}
 	case errors.Is(err, errRecordingInactive):
 		return &BindingError{Category: core.CategoryUsage, Code: "recording_inactive", Message: "no recording is running"}
+	case errors.Is(err, errClipPath):
+		return &BindingError{Category: core.CategoryUsage, Code: "invalid_clip_path", Message: "the clip path is not valid"}
+	case errors.Is(err, errRevealUnsupported):
+		return &BindingError{Category: core.CategoryInternal, Code: "reveal_unsupported", Message: "revealing files is not supported on this platform"}
 	case errors.Is(err, stream.ErrClipEmpty):
 		return &BindingError{Category: core.CategoryUsage, Code: "recording_empty", Message: "the recording ended before the first keyframe"}
 	case errors.Is(err, stream.ErrClipExists), errors.Is(err, stream.ErrClipWrite):

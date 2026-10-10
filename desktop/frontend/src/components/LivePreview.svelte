@@ -28,6 +28,8 @@
   let stats = $state<PreviewStats | undefined>()
   let recording = $state(false)
   let recordingMessage = $state('')
+  let savedPath = $state('')
+  let pathCopied = $state(false)
   let player: LivePlayer | undefined
   let snapshotPlayer: SnapshotPlayer | undefined
   let sessionId = ''
@@ -109,6 +111,7 @@
   async function startRecording(): Promise<void> {
     if (!sessionId || recording) return
     recordingMessage = ''
+    savedPath = ''
     const response = await api.startRecording(sessionId)
     if (response.data) {
       recording = true
@@ -132,6 +135,17 @@
     recordingMessage = response.data.interrupted
       ? t(locale, 'record.savedInterrupted', values)
       : t(locale, 'record.saved', values)
+    savedPath = response.data.path
+    pathCopied = false
+  }
+
+  async function copySavedPath(): Promise<void> {
+    pathCopied = await api.copyText(savedPath)
+  }
+
+  async function revealSavedPath(): Promise<void> {
+    const response = await api.revealClip(savedPath)
+    if (response.error) recordingMessage = t(locale, 'record.revealFailed')
   }
 
   async function stopPreview(): Promise<void> {
@@ -279,6 +293,22 @@
     {/if}
     {#if recordingMessage}
       <span class="live-status" role="status">{recordingMessage}</span>
+    {/if}
+    {#if savedPath}
+      <button
+        type="button"
+        class="button button-secondary"
+        onclick={() => void copySavedPath()}
+        >{pathCopied
+          ? t(locale, 'record.pathCopied')
+          : t(locale, 'record.copyPath')}</button
+      >
+      <button
+        type="button"
+        class="button button-secondary"
+        onclick={() => void revealSavedPath()}
+        >{t(locale, 'record.reveal')}</button
+      >
     {/if}
     {#if playerState}
       <span

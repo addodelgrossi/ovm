@@ -113,6 +113,7 @@ func (inv Inventory) withDefaults() Inventory {
 		inv.Services = []ServiceData{
 			{Namespace: "http://www.onvif.org/ver10/device/wsdl", XAddr: "http://device.invalid/onvif/device_service", VersionMajor: 25, VersionMinor: 6},
 			{Namespace: "http://www.onvif.org/ver10/media/wsdl", XAddr: "http://device.invalid/onvif/media_service", VersionMajor: 25, VersionMinor: 6},
+			{Namespace: "http://www.onvif.org/ver20/media/wsdl", XAddr: "http://device.invalid/onvif/media2_service", VersionMajor: 25, VersionMinor: 6},
 		}
 	} else {
 		inv.Services = append([]ServiceData(nil), inv.Services...)

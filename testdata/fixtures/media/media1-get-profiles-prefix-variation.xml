@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cameraEnvelope:Envelope xmlns:cameraEnvelope="http://schemas.xmlsoap.org/soap/envelope/" xmlns:media="http://www.onvif.org/ver10/media/wsdl" xmlns:types="http://www.onvif.org/ver10/schema">
+  <cameraEnvelope:Body>
+    <media:GetProfilesResponse>
+      <media:Profiles token="profile_main" fixed="true">
+        <types:Name>main</types:Name>
+        <types:VideoSourceConfiguration token="source_config_main">
+          <types:Name>Main source</types:Name>
+          <types:UseCount>1</types:UseCount>
+          <types:SourceToken>source_main</types:SourceToken>
+          <types:Bounds x="0" y="0" width="1920" height="1080"></types:Bounds>
+        </types:VideoSourceConfiguration>
+      </media:Profiles>
+      <media:Profiles token="profile_sub" fixed="true"><types:Name>sub</types:Name></media:Profiles>
+    </media:GetProfilesResponse>
+  </cameraEnvelope:Body>
+</cameraEnvelope:Envelope>

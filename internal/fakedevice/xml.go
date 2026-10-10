@@ -19,6 +19,11 @@ const (
 	syntheticNamespace  = "urn:ovm:synthetic"
 	wsseNamespace       = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
 	wsuNamespace        = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
+	maxRequestXMLDepth  = 96
+	maxRequestElements  = 50000
+	maxRequestTokens    = 100000
+	maxRequestAttrs     = 100000
+	maxRequestTextBytes = 1 << 20
 	//nolint:gosec // This is a public WS-Security type URI, not a credential.
 	passwordDigestURI = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest"
 	base64BinaryURI   = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary"
@@ -75,6 +80,7 @@ type requestBody struct {
 
 type operationWire struct {
 	XMLName  xml.Name
+	Attrs    []xml.Attr    `xml:",any,attr"`
 	Value    string        `xml:",chardata"`
 	Elements []textElement `xml:",any"`
 }
@@ -108,6 +114,7 @@ var syntheticOperations = map[string]string{
 func parseRequestEnvelope(data []byte, expected SOAPVersion) (requestEnvelope, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(data))
 	decoder.Strict = true
+	var depth, elements, tokens, attributes, textBytes int
 	for {
 		token, err := decoder.Token()
 		if errors.Is(err, io.EOF) {
@@ -116,9 +123,34 @@ func parseRequestEnvelope(data []byte, expected SOAPVersion) (requestEnvelope, e
 		if err != nil {
 			return requestEnvelope{}, err
 		}
-		if _, ok := token.(xml.Directive); ok {
-			return requestEnvelope{}, errors.New("document type declarations are not allowed")
+		tokens++
+		if tokens > maxRequestTokens {
+			return requestEnvelope{}, errors.New("request XML exceeds the token limit")
 		}
+		switch value := token.(type) {
+		case xml.Directive:
+			return requestEnvelope{}, errors.New("document type declarations are not allowed")
+		case xml.StartElement:
+			depth++
+			elements++
+			attributes += len(value.Attr)
+			if depth > maxRequestXMLDepth || elements > maxRequestElements || attributes > maxRequestAttrs {
+				return requestEnvelope{}, errors.New("request XML exceeds structural limits")
+			}
+		case xml.EndElement:
+			depth--
+			if depth < 0 {
+				return requestEnvelope{}, errors.New("request XML has invalid nesting")
+			}
+		case xml.CharData:
+			textBytes += len(value)
+			if textBytes > maxRequestTextBytes {
+				return requestEnvelope{}, errors.New("request XML exceeds the text limit")
+			}
+		}
+	}
+	if depth != 0 {
+		return requestEnvelope{}, errors.New("request XML has invalid nesting")
 	}
 	var envelope requestEnvelope
 	if err := xml.Unmarshal(data, &envelope); err != nil {
@@ -144,20 +176,31 @@ func parseRequestEnvelope(data []byte, expected SOAPVersion) (requestEnvelope, e
 // unmodeled QName, is rejected with errUnknownOperation. This guarantees the
 // dispatcher always derives the action from the validated body operation and
 // never from a SOAP header action alone.
+//
+// Device, synthetic, Media1 (ver10), and Media2 (ver20) operation tables are
+// each keyed by their own namespace so a local name shared across services
+// (for example GetProfiles under ver10 and ver20, or a Device local name reused
+// in a foreign namespace) resolves to exactly one action.
 func operationAction(operation operationWire) (string, error) {
 	local := operation.XMLName.Local
 	space := operation.XMLName.Space
-	if action, ok := deviceOperations[local]; ok {
-		if space != deviceNamespace {
-			return "", errUnknownOperation
+	switch space {
+	case deviceNamespace:
+		if action, ok := deviceOperations[local]; ok {
+			return action, nil
 		}
-		return action, nil
-	}
-	if action, ok := syntheticOperations[local]; ok {
-		if space != syntheticNamespace {
-			return "", errUnknownOperation
+	case syntheticNamespace:
+		if action, ok := syntheticOperations[local]; ok {
+			return action, nil
 		}
-		return action, nil
+	case media1Namespace:
+		if action, ok := media1Operations[local]; ok {
+			return action, nil
+		}
+	case media2Namespace:
+		if action, ok := media2Operations[local]; ok {
+			return action, nil
+		}
 	}
 	return "", errUnknownOperation
 }

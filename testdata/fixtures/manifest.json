@@ -145,6 +145,132 @@
       "license": "MIT",
       "sha256": "e4d29199aab27e2583198988d0381277110ae9c9aaac100e2dc4eceb8440fa19",
       "redactions": ["Not applicable: the MAC address uses the IANA documentation range (00:00:5E:00:53:xx) and no IP addresses are present."]
+    },
+    {
+      "path": "media/media1-get-profiles-prefix-variation.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media ver10 GetProfiles response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media ver10 WSDL (GetProfiles) and shared schema (VideoSourceConfiguration): https://www.onvif.org/ver10/media/wsdl/media.wsdl and https://www.onvif.org/ver10/schema/onvif.xsd",
+      "license": "MIT",
+      "sha256": "808c82a136430479b14440a28a577d8954337711df7c894c29bc526a3586870f",
+      "redactions": ["Not applicable: profile tokens and names are invented synthetic values."]
+    },
+    {
+      "path": "media/media1-get-video-sources-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media ver10 GetVideoSources response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media ver10 WSDL and shared schema (GetVideoSources): https://www.onvif.org/ver10/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "f027475aae6a70b5fe5f90a44b7587407b4d65bbfcf06e31fe6bc95d2e25fa92",
+      "redactions": ["Not applicable: source tokens, framerate, and resolution are invented synthetic values."]
+    },
+    {
+      "path": "media/media1-get-video-encoder-configurations-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media ver10 GetVideoEncoderConfigurations response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media ver10 WSDL and shared schema (GetVideoEncoderConfigurations): https://www.onvif.org/ver10/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "a0d408ab3f04a55e888b38b7043e5e3466c8b84888fb1ce023d929291a7e709f",
+      "redactions": ["Not applicable: encoder identities, dimensions, and rate-control values are invented synthetic values."]
+    },
+    {
+      "path": "media/media1-get-video-encoder-configuration-options-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media ver10 GetVideoEncoderConfigurationOptions response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media ver10 WSDL and shared schema (GetVideoEncoderConfigurationOptions): https://www.onvif.org/ver10/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "7be85dbd3bbaee48664b6deacb5c95bdc0a34186a99e64ab7f15df33791cc400",
+      "redactions": ["Not applicable: all supported ranges and profiles are invented synthetic values."]
+    },
+    {
+      "path": "media/media1-get-audio-encoder-configurations-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media ver10 GetAudioEncoderConfigurations response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media ver10 WSDL and shared schema (GetAudioEncoderConfigurations): https://www.onvif.org/ver10/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "2550be53a863bf7e36f373c02bddee66651e7a400e641eb904fd45b1cab64686",
+      "redactions": ["Not applicable: audio encoder identity and rate values are invented synthetic values."]
+    },
+    {
+      "path": "media/media1-get-stream-uri-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media ver10 GetStreamUri response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media ver10 WSDL (GetStreamUri): https://www.onvif.org/ver10/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "1a2bbaba6a550ee0a45944d4259672ff325dad5c75cd27f6fe4aae5afc9cbc13",
+      "redactions": ["Not applicable: the URI uses the reserved invalid host and an invented profile token."]
+    },
+    {
+      "path": "media/media1-get-snapshot-uri-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media ver10 GetSnapshotUri response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media ver10 WSDL (GetSnapshotUri): https://www.onvif.org/ver10/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "2d5357b8619c4eea267c6972b4d1994a5f935c9fd1929b26ed01b19ecafc7c89",
+      "redactions": ["Not applicable: the URI uses the reserved invalid host and an invented profile token."]
+    },
+    {
+      "path": "media/media2-get-profiles-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media2 ver20 GetProfiles response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media2 ver20 WSDL (GetProfiles) and shared schema (configuration types): https://www.onvif.org/ver20/media/wsdl/media.wsdl and https://www.onvif.org/ver10/schema/onvif.xsd",
+      "license": "MIT",
+      "sha256": "6d47a9934cc48d03584ea8c7d6324f5b3b5c4a4b67ab238669a69d21f8dede26",
+      "redactions": ["Not applicable: profile tokens and names are invented synthetic values."]
+    },
+    {
+      "path": "media/media2-get-video-encoder-configurations-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media2 ver20 GetVideoEncoderConfigurations response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media2 ver20 WSDL and shared schema (GetVideoEncoderConfigurations and VideoRateControl2): https://www.onvif.org/ver20/media/wsdl/media.wsdl and https://www.onvif.org/ver10/schema/onvif.xsd",
+      "license": "MIT",
+      "sha256": "7ddd7b6e8bd3150d31f059cba75dfdae72b47ab2b12310cdc245a4ea27172ada",
+      "redactions": ["Not applicable: encoder identity, dimensions, and quality are invented synthetic values."]
+    },
+    {
+      "path": "media/media2-get-video-encoder-configuration-options-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media2 ver20 GetVideoEncoderConfigurationOptions response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media2 ver20 WSDL and shared schema (GetVideoEncoderConfigurationOptions): https://www.onvif.org/ver20/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "82657afc68b4e539d762fe62376df9946b6f2893d97e66050f5898ff9904c8f2",
+      "redactions": ["Not applicable: encoding, dimensions, and ranges are invented synthetic values."]
+    },
+    {
+      "path": "media/media2-get-audio-encoder-configurations-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media2 ver20 GetAudioEncoderConfigurations response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media2 ver20 WSDL and shared schema (GetAudioEncoderConfigurations): https://www.onvif.org/ver20/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "e01bee12468463ac2f0a3b8410834b8fa04633c70344c2f848d2980cad0cc5c5",
+      "redactions": ["Not applicable: audio encoder identity and rate values are invented synthetic values."]
+    },
+    {
+      "path": "media/media2-get-stream-uri-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media2 ver20 GetStreamUri response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media2 ver20 WSDL (GetStreamUri): https://www.onvif.org/ver20/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "9ceb366f6c923c903af87b777ceaef062b2879cec78cbeb9285a8f78e7dd7a03",
+      "redactions": ["Not applicable: the URI uses the reserved invalid host and an invented profile token."]
+    },
+    {
+      "path": "media/media2-get-snapshot-uri-success.xml",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic Media2 ver20 GetSnapshotUri response generated without a camera or third-party capture.",
+      "sourceSpec": "Official ONVIF Media2 ver20 WSDL (GetSnapshotUri): https://www.onvif.org/ver20/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "c6168370b7b10d6d7b83442ab072c843dfd10facd723a0644f90fb34d26dda4f",
+      "redactions": ["Not applicable: the URI uses the reserved invalid host and an invented profile token."]
+    },
+    {
+      "path": "jpeg/synthetic-snapshot.jpg",
+      "synthetic": true,
+      "provenance": "Project-authored synthetic 8x8 grayscale gradient encoded by the Go standard library JPEG encoder. No camera capture, no third-party image, and no JFIF/EXIF/comment metadata segments.",
+      "sourceSpec": "ITU-T T.81 baseline JPEG, served by HTTP GET as specified by the official ONVIF Media GetSnapshotUri operation: https://www.onvif.org/ver10/media/wsdl/media.wsdl",
+      "license": "MIT",
+      "sha256": "7affa5a23f7cb2f99017011ce0386dbbcbd3b140bb1aaa4716c78b0bb41f8011",
+      "redactions": ["Not applicable: the image is an invented synthetic gradient with no captured content and no metadata."]
     }
   ]
 }

@@ -67,8 +67,15 @@ func New(config Config) (*Device, error) {
 	return device, nil
 }
 
-// ServeHTTP handles a bounded SOAP request.
+// ServeHTTP handles a bounded SOAP request, or the authenticated JPEG snapshot
+// GET endpoint. The snapshot endpoint shares the HTTP authentication policy
+// (Basic/Digest/none) but never requires a WS-Security UsernameToken, matching
+// a real camera's plain HTTP GET snapshot URI.
 func (d *Device) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+	if request.Method == http.MethodGet && d.isSnapshotPath(request.URL.Path) {
+		d.serveSnapshot(response, request)
+		return
+	}
 	if request.Method != http.MethodPost {
 		response.Header().Set("Allow", http.MethodPost)
 		response.WriteHeader(http.StatusMethodNotAllowed)
@@ -129,11 +136,16 @@ func (d *Device) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 	}
 
 	// Enforce request-wrapper structural validity (immediate child QName and
-	// cardinality) for the official Device wrappers before dispatch, so a
-	// wrapper with foreign, unknown, missing, duplicate, or forbidden children
-	// is rejected as InvalidArgVal and never reaches a response builder.
-	// Synthetic operations keep their own distinct parsing and are untouched.
+	// cardinality) for the official Device and Media wrappers before dispatch,
+	// so a wrapper with foreign, unknown, missing, duplicate, or forbidden
+	// children is rejected as InvalidArgVal and never reaches a response
+	// builder. Synthetic operations keep their own distinct parsing.
 	if err := validateDeviceRequestWrapper(action, operation); err != nil {
+		d.writeFault(response, version, FaultSpec{Kind: FaultInvalidArgVal, Reason: "Invalid request wrapper children"})
+		return
+	}
+	mediaRequest, err := validateMediaRequestWrapper(action, operation)
+	if err != nil {
 		d.writeFault(response, version, FaultSpec{Kind: FaultInvalidArgVal, Reason: "Invalid request wrapper children"})
 		return
 	}
@@ -151,11 +163,11 @@ func (d *Device) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		return
 	}
 
-	d.dispatch(response, version, action, operation)
+	d.dispatch(response, request, version, action, operation, mediaRequest)
 }
 
 // dispatch produces a synthetic response for a validated, authorized action.
-func (d *Device) dispatch(response http.ResponseWriter, version SOAPVersion, action string, operation operationWire) {
+func (d *Device) dispatch(response http.ResponseWriter, request *http.Request, version SOAPVersion, action string, operation operationWire, requestData mediaRequest) {
 	switch action {
 	case ActionGetSystemDateAndTime:
 		now := d.config.Clock().Add(d.config.ClockSkew)
@@ -189,11 +201,107 @@ func (d *Device) dispatch(response http.ResponseWriter, version SOAPVersion, act
 		d.SetState(stateRequest.Key, stateRequest.Value)
 		d.writeSuccess(response, version, buildSetState(d.config))
 	default:
-		// Unreachable: operationAction only returns modeled actions. Kept as a
-		// defensive fault rather than a silent success.
+		d.dispatchMedia(response, request, version, action, requestData)
+	}
+}
+
+// dispatchMedia produces a synthetic response for a validated, authorized Media
+// ver10 or ver20 action. Stream and snapshot URIs are derived from the live
+// request origin so they always point back at the serving host.
+func (d *Device) dispatchMedia(response http.ResponseWriter, request *http.Request, version SOAPVersion, action string, requestData mediaRequest) {
+	if !mediaReferencesExist(d.config.MediaInventory, action, requestData) {
+		d.writeFault(response, version, FaultSpec{Kind: FaultInvalidArgVal, Reason: "Unknown media reference token"})
+		return
+	}
+	origin := originFromRequest(request)
+	snapshotPath := d.config.MediaInventory.SnapshotPath
+	snapshotQuery := d.config.MediaInventory.SnapshotQuery
+	streamPath := d.config.MediaInventory.StreamPath
+	switch action {
+	case ActionMedia1GetProfiles:
+		d.writeMediaSuccess(response, version, mediaVer10, buildMediaProfiles(d.config, mediaVer10, requestData))
+	case ActionMedia2GetProfiles:
+		d.writeMediaSuccess(response, version, mediaVer20, buildMediaProfiles(d.config, mediaVer20, requestData))
+	case ActionMedia1GetVideoSources:
+		d.writeMediaSuccess(response, version, mediaVer10, buildVideoSources(d.config))
+	case ActionMedia1GetVideoEncoderConfigurations:
+		d.writeMediaSuccess(response, version, mediaVer10, buildVideoEncoderConfigurations(d.config, mediaVer10, requestData))
+	case ActionMedia2GetVideoEncoderConfigurations:
+		d.writeMediaSuccess(response, version, mediaVer20, buildVideoEncoderConfigurations(d.config, mediaVer20, requestData))
+	case ActionMedia1GetVideoEncoderConfigurationOptions:
+		d.writeMediaSuccess(response, version, mediaVer10, buildVideoEncoderOptions(d.config, mediaVer10))
+	case ActionMedia2GetVideoEncoderConfigurationOptions:
+		d.writeMediaSuccess(response, version, mediaVer20, buildVideoEncoderOptions(d.config, mediaVer20))
+	case ActionMedia1GetAudioEncoderConfigurations:
+		d.writeMediaSuccess(response, version, mediaVer10, buildAudioEncoderConfigurations(d.config, mediaVer10, requestData))
+	case ActionMedia2GetAudioEncoderConfigurations:
+		d.writeMediaSuccess(response, version, mediaVer20, buildAudioEncoderConfigurations(d.config, mediaVer20, requestData))
+	case ActionMedia1GetStreamURI:
+		d.writeMediaSuccess(response, version, mediaVer10, buildStreamURIResponse(mediaVer10, origin, streamPath, requestData))
+	case ActionMedia2GetStreamURI:
+		d.writeMediaSuccess(response, version, mediaVer20, buildStreamURIResponse(mediaVer20, origin, streamPath, requestData))
+	case ActionMedia1GetSnapshotURI:
+		d.writeMediaSuccess(response, version, mediaVer10, buildSnapshotURIResponse(mediaVer10, origin, snapshotPath, snapshotQuery, requestData))
+	case ActionMedia2GetSnapshotURI:
+		d.writeMediaSuccess(response, version, mediaVer20, buildSnapshotURIResponse(mediaVer20, origin, snapshotPath, snapshotQuery, requestData))
+	default:
 		d.writeFault(response, version, FaultSpec{Kind: FaultActionNotSupported, Reason: "Operation is not implemented by the synthetic device"})
 	}
 }
+
+func mediaReferencesExist(inventory MediaInventory, action string, request mediaRequest) bool {
+	media := mediaVersionForAction(action)
+	if request.profileToken != "" {
+		if _, ok := findMediaProfile(inventory, media, request.profileToken); !ok {
+			return false
+		}
+	}
+	if request.configurationToken == "" {
+		return true
+	}
+	switch action {
+	case ActionMedia1GetVideoEncoderConfigurationOptions:
+		_, ok := findMedia1VideoEncoder(inventory, request.configurationToken)
+		return ok
+	case ActionMedia2GetVideoEncoderConfigurations,
+		ActionMedia2GetVideoEncoderConfigurationOptions:
+		_, ok := findMedia2VideoEncoder(inventory, request.configurationToken)
+		return ok
+	case ActionMedia2GetAudioEncoderConfigurations:
+		_, ok := findMedia2AudioEncoder(inventory, request.configurationToken)
+		return ok
+	default:
+		return false
+	}
+}
+
+// isSnapshotPath reports whether path targets the synthetic JPEG endpoint. The
+// comparison is on the exact configured path so an unrelated GET falls through
+// to the method-not-allowed branch.
+func (d *Device) isSnapshotPath(path string) bool {
+	return path == d.config.MediaInventory.SnapshotPath
+}
+
+// serveSnapshot serves the synthetic JPEG under the HTTP authentication policy.
+// It records a credential-free request entry, enforces Basic/Digest/none exactly
+// as the SOAP endpoint does, and never requires a WS-Security UsernameToken: a
+// snapshot URI is a plain authenticated GET.
+func (d *Device) serveSnapshot(response http.ResponseWriter, request *http.Request) {
+	// Record only a fixed marker. Neither the configured path, query, profile
+	// token, nor Authorization header can enter request history.
+	d.recordRequest(RequestRecord{Action: snapshotRecordAction})
+	if !d.authorizeHTTP(response, request) {
+		return
+	}
+	response.Header().Set("Content-Type", "image/jpeg")
+	response.Header().Set("Content-Length", strconv.Itoa(len(d.config.JPEGSnapshot)))
+	response.WriteHeader(http.StatusOK)
+	_, _ = response.Write(d.config.JPEGSnapshot)
+}
+
+// snapshotRecordAction labels snapshot GETs in the credential-free request
+// history. It is a synthetic marker, not a protocol action URI.
+const snapshotRecordAction = "urn:ovm:synthetic:SnapshotGet:"
 
 // SetState updates a synthetic state value.
 func (d *Device) SetState(key, value string) {
@@ -350,6 +458,14 @@ func (d *Device) writeSuccess(response http.ResponseWriter, version SOAPVersion,
 	setResponseContentType(response.Header(), version)
 	response.WriteHeader(http.StatusOK)
 	_, _ = io.WriteString(response, buildEnvelope(d.config, version, payload))
+}
+
+// writeMediaSuccess writes a media payload wrapped in an envelope that binds the
+// media operation prefix to the correct ver10/ver20 namespace.
+func (d *Device) writeMediaSuccess(response http.ResponseWriter, version SOAPVersion, media mediaVersion, payload string) {
+	setResponseContentType(response.Header(), version)
+	response.WriteHeader(http.StatusOK)
+	_, _ = io.WriteString(response, buildMediaEnvelope(d.config, version, media, payload))
 }
 
 func (d *Device) writeFault(response http.ResponseWriter, version SOAPVersion, fault FaultSpec) {

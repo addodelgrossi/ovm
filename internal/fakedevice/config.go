@@ -94,8 +94,9 @@ var xmlPrefixPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
 // reservedResponsePrefixes are the fixed prefixes the synthetic responses bind
 // to ONVIF and project namespaces. Configurable envelope and operation prefixes
 // must not collide with them, otherwise a single prefix would be bound to two
-// different namespaces in one document.
-var reservedResponsePrefixes = []string{"tt", "ter", "ovm"}
+// different namespaces in one document. The media prefixes trt/tr2 are included
+// because media responses bind them to the ver10/ver20 Media namespaces.
+var reservedResponsePrefixes = []string{"tt", "ter", "ovm", "trt", "tr2"}
 
 // FaultSpec configures a SOAP fault for an action.
 type FaultSpec struct {
@@ -137,6 +138,15 @@ type Config struct {
 	// Inventory supplies synthetic device-management inventory data for the
 	// typed Device operations. A zero value is filled with defaults.
 	Inventory Inventory
+
+	// MediaInventory supplies synthetic Media ver10 and ver20 data. A zero
+	// value is filled with defaults.
+	MediaInventory MediaInventory
+
+	// JPEGSnapshot is the exact synthetic JPEG served by the authenticated GET
+	// snapshot endpoint. When empty, a project-owned synthetic default is used.
+	// It must be project-authored bytes, never a captured image.
+	JPEGSnapshot []byte
 
 	UnsupportedActions map[string]bool
 	Faults             map[string]FaultSpec
@@ -181,8 +191,8 @@ func normalizeConfig(config Config) (normalizedConfig, error) {
 		return normalizedConfig{}, errors.New("fake-device XML prefixes must be distinct")
 	}
 	// The envelope and operation prefixes must not collide with the fixed
-	// tt/ter/ovm prefixes bound by every synthetic response, or one prefix
-	// would be declared for two namespaces in a single document.
+	// tt/ter/ovm/trt/tr2 prefixes bound by every synthetic response, or one
+	// prefix would be declared for two namespaces in a single document.
 	for _, prefix := range reservedResponsePrefixes {
 		if config.EnvelopePrefix == prefix || config.OperationPrefix == prefix {
 			return normalizedConfig{}, fmt.Errorf("fake-device prefix %q collides with a reserved response prefix", prefix)
@@ -241,6 +251,24 @@ func normalizeConfig(config Config) (normalizedConfig, error) {
 		return normalizedConfig{}, errors.New("fake-device Digest nonce requires HTTP Digest authentication")
 	}
 	config.Inventory = config.Inventory.withDefaults()
+	if err := validateInventoryXSIntFields(config.Inventory); err != nil {
+		return normalizedConfig{}, err
+	}
+	config.MediaInventory = config.MediaInventory.withDefaults()
+	if err := validateMediaInventory(config.MediaInventory); err != nil {
+		return normalizedConfig{}, err
+	}
+	// The snapshot JPEG is copied so the device owns its bytes independently of
+	// the caller's slice and cannot race with later caller mutation. An empty
+	// configuration receives the project-owned synthetic default.
+	if len(config.JPEGSnapshot) == 0 {
+		config.JPEGSnapshot = append([]byte(nil), syntheticJPEG...)
+	} else {
+		config.JPEGSnapshot = append([]byte(nil), config.JPEGSnapshot...)
+	}
+	if err := validateSyntheticJPEG(config.JPEGSnapshot); err != nil {
+		return normalizedConfig{}, err
+	}
 	for action, fault := range config.Faults {
 		if action == "" {
 			return normalizedConfig{}, errors.New("fake-device fault action cannot be empty")

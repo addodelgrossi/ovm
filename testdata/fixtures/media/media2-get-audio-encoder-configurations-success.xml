@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope" xmlns:tr2="http://www.onvif.org/ver20/media/wsdl" xmlns:tt="http://www.onvif.org/ver10/schema">
+  <env:Body>
+    <tr2:GetAudioEncoderConfigurationsResponse><tr2:Configurations token="aenc0"><tt:Name>AudioEncoderMain</tt:Name><tt:UseCount>1</tt:UseCount><tt:Encoding>PCMU</tt:Encoding><tt:Bitrate>64</tt:Bitrate><tt:SampleRate>8</tt:SampleRate></tr2:Configurations></tr2:GetAudioEncoderConfigurationsResponse>
+  </env:Body>
+</env:Envelope>

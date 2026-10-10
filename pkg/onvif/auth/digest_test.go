@@ -330,6 +330,13 @@ func newTestDigestTransport(t *testing.T, rawScope string, config DigestTranspor
 		t.Fatalf("parse scope: %v", err)
 	}
 	config.Scope = scope
+	if config.Base == nil {
+		// httptest.Server.Close closes idle connections on the shared
+		// http.DefaultTransport, which breaks parallel tests mid-request.
+		base := &http.Transport{}
+		t.Cleanup(base.CloseIdleConnections)
+		config.Base = base
+	}
 	transport, err := NewDigestTransport(config)
 	if err != nil {
 		t.Fatalf("NewDigestTransport() error = %v", err)

@@ -10,7 +10,7 @@ backend. Protocol libraries are public and UI-independent.
 - `pkg/stream`: RTSP sessions, media statistics, remuxing, and recording.
 - `internal/app`: application use cases and normalized presentation models.
 - `internal/store`: versioned non-secret metadata and secret-provider adapters.
-- `internal/fakedevice`: stateful ONVIF/RTSP test and demo services.
+- `internal/fakedevice`: stateful Device/Media SOAP and authenticated JPEG test services.
 - `desktop`: Wails host, generated bindings, and Svelte frontend.
 
 Dependencies point inward through explicit interfaces. Neither public library
@@ -22,10 +22,11 @@ can import desktop, CLI, or persistence packages.
 future Wails backend. It owns use-case orchestration and never leaks transport,
 XML, or UI types.
 
-- **Use cases** are expressed as narrow interfaces — `DiscoveryUseCase` and
-  `InventoryUseCase` — so the CLI and tests inject deterministic seams with no
-  multicast or hardware dependency. Production wiring lives in
-  `NewProductionDiscovery` and `NewProductionInventory`.
+- **Use cases** are expressed as narrow interfaces — `DiscoveryUseCase`,
+  `InventoryUseCase`, `MediaProfilesUseCase`, and `SnapshotUseCase` — so the CLI
+  and tests inject deterministic seams with no multicast or hardware dependency.
+  Production wiring lives in `NewProductionDiscovery`, `NewProductionInventory`,
+  `NewProductionMediaProfiles`, and `NewProductionSnapshot`.
 - **DTOs** are explicit, credential-free, and JSON-tagged. Raw XML, SOAP
   transport types, and auth material never cross the boundary.
 - **Capability states** are exactly `supported`, `unsupported`, `unknown`, and
@@ -60,20 +61,27 @@ XML, or UI types.
 - **Errors** are typed with stable categories (`usage`, `network`,
   `authentication`, `protocol`, `cancelled`, `internal`) and support
   `errors.Is`/`errors.As`. Their user-facing text is always credential-free.
-- **Authentication** is composed, not duplicated: the inventory adapter wraps
-  the SOAP HTTP client in an origin-scoped HTTP Digest transport, performs an
+- **Authentication** is composed, not duplicated: each host-scoped use case
+  owns one authenticated camera session and one origin-scoped HTTP
+  Digest/Basic transport. Device, Media1, Media2, and snapshot GET requests in
+  that use case share its challenge cache, sampled clock offset, fresh
+  WS-Security UsernameTokens, and retry gate. The session performs an
   unauthenticated clock call first (which also lets the transport answer a
   Digest challenge), samples the device clock offset, and attaches a freshly
-  generated WS-Security UsernameToken PasswordDigest header for authenticated
-  operations. The initial clock negotiation runs under a short child budget (the
+  generated UsernameToken PasswordDigest header for authenticated SOAP
+  operations. Snapshot HTTP GETs reuse the transport but carry no WS-Security
+  header. The initial clock negotiation runs under a short child budget (the
   smaller of 2s and 20% of the remaining parent budget) with bounded attempts. A
   SOAP `NotAuthorized` fault triggers exactly one retry with a new token,
   preceded by a single shared, bounded clock resample (the smaller of 750ms and
-  10% of the remaining budget); the sampled offset is race-protected, parent
-  cancellation is honoured, and a failed resample falls back to the prior (or
-  zero) offset without blocking the retry. Network and protocol errors never
-  trigger an authentication retry. Credentials are ephemeral, non-serializable,
-  and never returned.
+  10% of the remaining budget); the sampled offset is race-protected. Context
+  lifecycle is checked before the first call, before header generation,
+  resampling, and retry, and after each callback. Cancellation or deadline
+  completion, including an error that also matches `NotAuthorized`, therefore
+  prevents the retry callback. A failed resample falls back to the prior (or
+  zero) offset only while the parent remains active. Network and protocol errors
+  never trigger an authentication retry. Credentials are ephemeral,
+  non-serializable, and never returned.
 - **Authentication downgrades** are opt-in and secure-by-default, enforced
   natively through the auth package's public hooks. `--allow-basic` maps only
   to `AllowBasic` and therefore permits Basic on HTTPS endpoints. The separate
@@ -99,6 +107,38 @@ XML, or UI types.
   marker. This guarantees redaction of credentials in userinfo, query, and
   fragment components; URI paths and opaque identity content are intentionally
   preserved and are not claimed to be secret-free.
+
+## M2 Media and snapshot boundaries
+
+- The Media1 and Media2 wire packages expose only the supported read subset.
+  The application prefers Media2 independently per operation and falls back to
+  Media1 only for a namespace-resolved `ActionNotSupported`; authentication,
+  cancellation, deadline, transport, HTTP, decode, malformed-response, and
+  security failures never trigger a fallback request.
+- Profile DTOs retain every profile, sort by token, and emit operation statuses
+  in a fixed order. Each status carries capability state, Media1/Media2 source,
+  and a `fell_back` marker. Encoder summaries carry configured codec,
+  resolution, frame rate, bitrate, GOP, codec profile, and audio values.
+- Advertised Media endpoints are validated against the camera origin before any
+  credential or UsernameToken is applied. Duplicate or unsafe service
+  advertisements fail closed. Operational endpoint and snapshot queries remain
+  private to the session; presentation RTSP and snapshot URIs are separately
+  validated and query-free.
+- Snapshot selection uses an explicit token or the lexicographically smallest
+  non-empty token returned by the preferred service. Explicit tokens are
+  validated before endpoint preparation or network I/O: valid UTF-8, 1–64
+  Unicode code points, no C0/C1 controls or replacement rune, and not
+  whitespace-only. XML-special characters remain valid for wire escaping. The
+  JPEG GET reuses the authenticated transport, rejects cross-origin/downgrade
+  redirects, non-JPEG responses, truncation, and bodies over 20 MiB by default.
+  Before publication, JPEG dimensions are read without a full allocation and
+  limited to 16384 per axis and 67,108,864 total pixels; the bounded body must
+  then decode completely with no trailing data. The use case returns metadata
+  rather than bytes.
+- Snapshot files stream to a same-directory `0600` temporary file, are synced,
+  closed, and then published atomically. The default uses a no-clobber hard-link
+  publication; explicit overwrite uses atomic rename. Failure and cancellation
+  remove temporary files and preserve an existing destination.
 
 ## M1 protocol boundaries
 
@@ -134,10 +174,15 @@ XML, or UI types.
 - SOAP responses have both byte limits and structural depth/element/attribute/
   namespace-work limits before a tree is allocated.
 
-The CLI maps the typed error categories to a stable exit-code table (see the
-README), emits the same versioned JSON envelope for success and failure, and
-prints a safe error exactly once. A plain timeout is never reported as a
-permission problem.
+The CLI maps typed error categories to a stable exit-code table (see the
+README). `discover`, `info`, `profiles`, and `snapshot` emit typed
+`schema_version: 1` envelopes for success and failure, including validation
+failures detected after normal flag parsing stops by consulting command-scoped
+raw-argument JSON intent. Human profile output is deterministic and
+single-line-sanitized. Snapshot stdout contains metadata only; JPEG bytes are
+written exclusively through the application file boundary. Process errors are
+printed safely and once. A plain timeout is never reported as a permission
+problem.
 
 See [ADR 0001](adr/0001-stack-and-architecture.md) for the initial decision and
 [PLAN.md](PLAN.md) for milestone details.

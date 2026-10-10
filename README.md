@@ -26,11 +26,11 @@ remote cloud access.
 
 See [the implementation plan](docs/PLAN.md) and
 [ADR 0001](docs/adr/0001-stack-and-architecture.md). Milestone M1 (ONVIF core
-and CLI) is **in progress**. The typed Device inventory client, interface-aware
-WS-Discovery, `discover` and `info` commands, and shared `internal/app` core are
-implemented and covered by synthetic-fixture tests against the in-process fake
-ONVIF device and injected packet connections. No camera hardware has been
-verified and the remote CI gate has not been declared passed for M1.
+and CLI) is complete. Milestone M2 (Media and Snapshot) is **in progress**:
+typed Media1/Media2 clients, normalized profile and snapshot use cases, the
+`profiles` and `snapshot` commands, and the expanded in-process fake device are
+implemented and pass local synthetic-fixture tests. M2 remains in progress until
+remote CI passes. No physical camera has been verified.
 
 ## Commands
 
@@ -46,14 +46,45 @@ ovm discover [--iface name] [--timeout 3s] [--json]
 ovm info <host> [-u user] [--password-env NAME] \
     [--allow-basic [--allow-insecure-basic]] [--allow-legacy-digest] \
     [--timeout duration] [--json]
+
+# List every normalized media profile and presentation-safe URI.
+ovm profiles <host> [-u user] [--password-env NAME] \
+    [--allow-basic [--allow-insecure-basic]] [--allow-legacy-digest] \
+    [--timeout duration] [--json]
+
+# Write a JPEG snapshot to FILE. The profile token is optional; -o/--output is not.
+ovm snapshot <host> [--profile TOKEN] -o FILE [--force] \
+    [-u user] [--password-env NAME] \
+    [--allow-basic [--allow-insecure-basic]] [--allow-legacy-digest] \
+    [--timeout duration] [--json]
 ```
 
-`info` accepts a host, `host:port`, or a full `http(s)://` URL and canonicalizes
-it to the ONVIF device service path. Human output includes operation support,
-identity, time, hostname, capability/service endpoints, scopes, and network
-interfaces. JSON output always uses a `schema_version: 1` envelope; runtime and
-validation failures retain that envelope with a safe `error` object and return
-a nonzero exit code.
+The host-scoped commands accept a host, `host:port`, or full `http(s)://` Device
+service URL. `profiles` reports every profile in deterministic token order,
+including Media1/Media2 provenance, codec, resolution, frame rate, bitrate, GOP,
+and presentation-safe RTSP TCP/UDP and snapshot URIs. Displayed URIs never
+contain userinfo, query, or fragment components and are not operational
+credential-bearing forms.
+
+`snapshot` writes JPEG bytes only to the named file and reports credential-free
+metadata to stdout. When `--profile` is omitted, it selects the
+lexicographically smallest non-empty profile token returned by the preferred
+media service. An explicit token is validated before any endpoint or network
+work: it must contain 1–64 Unicode code points, be valid UTF-8, and contain no
+control characters; XML-special characters remain valid and are escaped by the
+protocol serializer. The response must advertise `image/jpeg`, stay within the
+20 MiB default encoded-size bound, declare dimensions no larger than 16384 per
+axis or 67,108,864 total pixels, and decode completely with no trailing data
+before publication. Publication uses a same-directory `0600` temporary file and
+is atomic. Existing files are refused unless `--force` explicitly authorizes an
+atomic replacement; errors and cancellation leave no partial output.
+
+`info` human output includes operation support, identity, time, hostname,
+capability/service endpoints, scopes, and network interfaces. Machine output
+for `discover`, `info`, `profiles`, and `snapshot` uses a stable
+`schema_version: 1` typed envelope; runtime and validation failures retain the
+command's envelope with a safe categorized `error` object and return a nonzero
+exit code.
 
 Active discovery emits the ONVIF-required WS-Discovery 2005/04 probe family;
 2009/01 support is limited to coherent inbound parser tolerance. It requires
@@ -63,21 +94,23 @@ Probe with bounded jitter while retaining its MessageID. The passive
 `ListenStream` API reports setup/runtime errors, deduplicates MessageID per
 interface, and suppresses stale Hello/Bye notifications using AppSequence.
 
-Every URL-bearing field (discovery addresses, scopes, type namespaces, and
-capability/service endpoints) is validated and redacted at the application
-boundary: userinfo, query, and fragment are removed, and a value that is not a
-valid URI — or, for a transport endpoint, not an absolute HTTP(S) URL with a
-host — is omitted behind a safe marker so invalid values and credentials in
-userinfo, query, or fragment components never reach output. URI path and opaque
-identity content are preserved and are not claimed to be secret-free.
+Every URL-bearing field is validated and redacted at the application boundary.
+Device/discovery presentation fields remove userinfo, query, and fragment;
+Media presentation URIs additionally enforce camera-origin/host and supported
+scheme rules before their query is stripped. Operational Media service and
+snapshot URLs retain required paths and queries only inside the authenticated
+use case and never cross into DTOs, CLI output, errors, or fake-device request
+history. URI paths and opaque identity content remain visible and are not
+claimed to be secret-free.
 
 ### Credentials
 
-M1 supports **environment-variable credentials only**. Supply the username with
-`--user` and name the environment variable that holds the password with
-`--password-env`; there is no plaintext `-p`/`--password` flag, and the password
-value is never printed to stdout, stderr, logs, or JSON. Secure terminal prompts
-and system-keychain input are planned for a later milestone.
+The host-scoped CLI commands support **environment-variable credentials only**.
+Supply the username with `--user` and name the environment variable that holds
+the password with `--password-env`; there is no plaintext `-p`/`--password`
+flag, and the password value is never printed to stdout, stderr, logs, or JSON.
+Secure terminal prompts and system-keychain input are planned for a later
+milestone.
 
 Populate the environment variable through a trusted secret injector or your
 shell's non-echoing input; do not place a literal password in shell history.
@@ -86,6 +119,9 @@ Then run:
 ```sh
 export OVM_CAMERA_PASSWORD
 ovm info 192.0.2.10 -u admin --password-env OVM_CAMERA_PASSWORD --json
+ovm profiles 192.0.2.10 -u admin --password-env OVM_CAMERA_PASSWORD --json
+ovm snapshot 192.0.2.10 -u admin --password-env OVM_CAMERA_PASSWORD \
+    -o snapshot.jpg --json
 unset OVM_CAMERA_PASSWORD
 ```
 
@@ -126,8 +162,9 @@ The CLI uses a stable exit-code mapping:
 A timeout-only discovery round with no replies is a successful empty result and
 writes a `no_response` diagnostic to stderr; it never claims permission denial.
 Concrete socket or permission-like errors use exit 3. An explicit cancellation
-(for example an interrupt) always maps to 130 and returns whatever partial
-inventory was collected, even if some operations had already succeeded.
+(for example an interrupt) always maps to 130. Discovery, inventory, and profile
+commands preserve any useful partial result already assembled; snapshot
+cancellation removes its temporary file and never emits JPEG bytes to stdout.
 
 ## Requirements
 
@@ -148,6 +185,10 @@ make frontend-check
 
 go run ./cmd/ovm version
 go run ./cmd/ovm discover --timeout 3s
+
+# Hermetic M2 CLI smoke coverage against the complete in-process fake device.
+go test -run 'TestProfilesCLIEndToEnd|TestSnapshotCLIEndToEnd' ./internal/cli -v
+go test -run TestProcessM2ProfilesAndSnapshotAgainstFullFake ./cmd/ovm -v
 ```
 
 The optional manual real-camera smoke test is excluded from the default build

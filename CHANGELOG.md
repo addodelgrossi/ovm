@@ -59,14 +59,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Manual, build-tagged real-camera smoke test using `OVM_TEST_HOST`,
   `OVM_TEST_USER`, and `OVM_TEST_PASS`, excluded from the default build and
   public CI.
-- Separate `info` downgrade flags: `--allow-basic` permits Basic only over
-  HTTPS, `--allow-insecure-basic` independently permits plaintext HTTP and
-  requires `--allow-basic`, and `--allow-legacy-digest` permits RFC 2069.
-  Each enabled downgrade requires credentials and emits one fixed,
-  credential-free warning on stderr without polluting JSON stdout.
+- Separate host-command downgrade flags: `--allow-basic` permits Basic only
+  over HTTPS, `--allow-insecure-basic` independently permits plaintext HTTP and
+  requires `--allow-basic`, and `--allow-legacy-digest` permits RFC 2069. Each
+  enabled downgrade requires credentials and emits one fixed, credential-free
+  warning on stderr without polluting JSON stdout. The same flags, policies,
+  warning order, timeout behavior, and environment-only password input are used
+  by `info`, `profiles`, and `snapshot`.
+- Typed Media1 and Media2 read clients and one shared authenticated application
+  session for Device, Media1, Media2, and snapshot GET operations. Normalized
+  profile DTOs retain every profile in token order, report Media1/Media2
+  provenance and narrow fallback per operation, and expose codec, resolution,
+  frame rate, bitrate, GOP, audio, and presentation-safe RTSP/snapshot URIs.
+- `ovm profiles <host>` with deterministic complete human output and a stable
+  `schema_version: 1`, `kind: profiles` JSON envelope. Media2 is preferred per
+  operation; only namespace-resolved `ActionNotSupported` can fall back to
+  Media1.
+- `ovm snapshot <host> [--profile TOKEN] -o FILE` with deterministic default
+  selection, pre-network validation of explicit 1–64-code-point profile tokens,
+  credential-free metadata output, a stable `kind: snapshot` JSON envelope, a
+  20 MiB default encoded-size limit, bounded JPEG dimensions and total pixels,
+  complete structural JPEG decoding before publication, and explicit `--force`
+  overwrite opt-in. XML-special token characters are preserved for safe wire
+  escaping, and JPEG bytes are never written to stdout.
+- Expanded fake-device Media1/Media2 fixtures, profile/configuration association
+  validation, authenticated synthetic JPEG serving, fault controls, and
+  credential-free request history. Command, golden, application, and real
+  subprocess tests cover full Media2, Media1-only, partial fallback, auth
+  policy, secret/query non-echo, cancellation, JSON stability, and output
+  atomicity.
 
 ### Changed
 
+- Snapshot retrieval now selects the lexicographically smallest non-empty
+  profile token in the same authenticated session when no token is supplied.
+  Destination validation happens before network I/O; publication is atomic and
+  no-clobber by default, with replacement allowed only by an explicit overwrite
+  request (`--force` in the CLI).
 - Inventory cancellation now has explicit-cancellation precedence: once the use
   case has started, an explicit `context.Canceled` of the parent context always
   wins and returns the partial inventory together with a `cancelled` error that
@@ -92,13 +121,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   smaller of 2s and 20% of the remaining parent budget) with bounded attempts.
   A retry triggered by a SOAP `NotAuthorized` fault performs one shared, bounded
   clock resample (the smaller of 750ms and 10% of the remaining budget, single
-  attempt) before one fresh-token retry. The sampled offset is race-protected,
-  parent cancellation is honoured, and a failed resample falls back to the prior
-  (or zero) offset without blocking the retry. The retry path is now covered by
-  a deterministic test that drives an actual SOAP `NotAuthorized` failure
-  through the seam and proves exactly one shared, bounded-deadline resample for
-  the whole use case, exactly one retry per operation, and that parent
-  cancellation arriving during the resample wins so no retry succeeds.
+  attempt) before one fresh-token retry. The sampled offset is race-protected;
+  context lifecycle is checked before callback/header/resample/retry boundaries,
+  and cancellation or deadline completion prevents the retry callback even when
+  the same error also matches `NotAuthorized`. A failed resample falls back to
+  the prior (or zero) offset only while the parent remains active. Deterministic
+  callback and transport-count tests prove one shared resample during active
+  concurrent retries and zero retry callbacks after lifecycle completion.
 - Discovery no longer discards devices found before a mid-round cancellation.
   When the underlying discoverer returns an aggregated-so-far result together
   with `context.Canceled`, the application normalizes and returns the partial
@@ -126,6 +155,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- CLI flag-parse failures now discard parser diagnostics that can embed malformed
+  argument values and return fixed command-scoped usage text instead. Raw
+  command-aware `--json` intent still emits the correct typed failure envelope
+  without reflecting credential- or URI-shaped values to stderr.
+- Camera-originated media failures, including absent advertised Media services
+  and unsafe snapshot URIs, are categorized as protocol failures rather than
+  caller usage errors; their fixed messages retain no device-supplied value.
 - Authentication downgrade policy is enforced by independent native hooks.
   `AllowBasic` permits challenge-driven Basic only on HTTPS; the separate
   `AllowBasicOverHTTP` gate is zero-value-off and can be enabled only through
@@ -149,6 +185,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in userinfo, query, and fragment components cannot cross into a DTO or output;
   URI paths and opaque identity content remain visible and are not claimed to be
   secret-free.
+- Media operational endpoints are validated same-origin before credentials or
+  WS-Security are applied; duplicate or unsafe service advertisements fail
+  closed. Presentation URIs reject userinfo, fragments, controls, and
+  cross-origin hosts, then strip queries. Snapshot redirects are checked before
+  target contact, operational queries never cross into DTOs/errors, and the
+  authenticated JPEG writer uses bounded reads, `0600` temporary files, atomic
+  no-clobber publication, and explicit overwrite authorization.
 - The `pkg/onvif/device` decoder now enforces independent aggregate caps on
   total decoded character data, total attribute material, XML token work, and a
   weighted structural complexity score, in addition to the existing depth,
@@ -158,5 +201,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-- M1 remains in progress. Evidence is synthetic-fixture only; no camera hardware
-  has been verified and the remote CI gate for M1 has not been declared passed.
+- M1 is complete. M2 implementation and local synthetic-fixture validation are
+  complete, but M2 remains in progress until remote CI passes. No physical
+  camera has been verified, and no hardware or conformance claim is made.

@@ -16,13 +16,18 @@ test evidence from hardware claims.
 
 | Manufacturer | Model | Firmware | Evidence | Notes |
 |---|---|---|---|---|
-| Generic ONVIF fake device | Synthetic | Project-owned | Synthetic-fixture-tested | All seven Device inventory operations, plus unauthenticated, HTTP Digest + WS-Security UsernameToken, and opt-in HTTP Basic authentication, pass end to end through `internal/app` and the CLI against `internal/fakedevice`. |
+| Generic ONVIF fake device | Synthetic | Project-owned | Synthetic-fixture-tested | Device inventory plus Media1/Media2 profile reads, narrow partial fallback, authenticated JPEG snapshots, Digest + UsernameToken, and opt-in Basic policies pass end to end through `internal/app`, the CLI command tree, and real `ovm` subprocess tests. |
 
-The synthetic-fixture evidence covers the `discover` and `info` application and
-CLI paths only. It is **not** a hardware or conformance claim. The optional
-manual real-camera smoke test (build tag `manual`, environment variables
-`OVM_TEST_HOST`/`OVM_TEST_USER`/`OVM_TEST_PASS`) runs only on an operator's own
-isolated network and does **not** upgrade any row to hardware-verified.
+Synthetic-fixture evidence covers `discover`, `info`, `profiles`, and `snapshot`.
+Media tests include Media1-only, full Media2, per-operation
+`ActionNotSupported` fallback, deterministic JSON, query/credential
+non-disclosure, cancellation, and atomic no-clobber/forced snapshot output. See
+[fake-device.md](fake-device.md) for the harness contract. This evidence is
+**not** a hardware, interoperability, or ONVIF conformance claim. The optional
+manual real-camera smoke test remains inventory-only (build tag `manual`,
+environment variables `OVM_TEST_HOST`/`OVM_TEST_USER`/`OVM_TEST_PASS`) and runs
+only on an operator's isolated network; it does **not** upgrade any row to
+hardware-verified.
 
 A v0.1.0 release requires hardware verification with at least two cameras.
 

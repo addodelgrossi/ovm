@@ -81,10 +81,12 @@ internal/fakedevice -------- integration tests and desktop demo mode
   offset-adjusted WS-UsernameToken PasswordDigest, HTTP Digest, and Basic only
   after explicit opt-in.
 - Generate whole-second RFC3339 `Created` values for interoperability.
-- Prefer Media2 per operation and fall back to Media v1 only for an unsupported
-  or protocol-incompatible operation—not for authentication or network errors.
+- Prefer Media2 per operation and fall back to Media v1 only for a
+  namespace-resolved `ActionNotSupported` response—not for authentication,
+  cancellation, deadline, transport, HTTP, decode, malformed-response, or
+  security errors.
 - Represent support as `supported`, `unsupported`, `unknown`, or
-  `temporarily unavailable`.
+  `temporarily_unavailable`.
 - Every mutation follows: read current value, read options, validate, set,
   poll/read back, and report exact/clamped/failed/disconnected.
 
@@ -149,24 +151,31 @@ available and always report method and uncertainty. A result is
 - Interface-aware WS-Discovery, Hello/Bye, and manual endpoint entry.
 - `ovm discover` and `ovm info` with stable JSON output.
 
-Current work (M1 remains **in progress**): the seven typed Device inventory
-operations, separate correlated `tds:Device`/legacy NVT discovery probes,
-passive Hello/Bye lifecycle, manual endpoint handling, `internal/app` boundary,
-production discovery/inventory adapters (Digest + UsernameToken + opt-in Basic),
-and the `discover`/`info` commands are implemented with stable success/failure
-JSON envelopes, a documented exit-code mapping, and credential redaction.
-Evidence is synthetic-fixture only against `internal/fakedevice` and injected
-packet connections; no camera hardware is verified and the remote CI gate for
-M1 is not yet declared passed. The milestone status stays **In progress** until
-remote CI passes.
+Completed M1 work includes the seven typed Device inventory operations,
+separate correlated `tds:Device`/legacy NVT discovery probes, passive Hello/Bye
+lifecycle, manual endpoint handling, the shared `internal/app` boundary,
+production discovery/inventory adapters, and the `discover`/`info` commands with
+stable success/failure JSON envelopes, documented exit codes, cancellation, and
+credential redaction. Evidence is synthetic-fixture and remote-CI validation;
+no camera hardware is verified.
 
 ### M2 — Media
 
 - Media v1 and Media2 profile/source/configuration reads.
 - Per-operation Media2 fallback and normalized profile DTOs.
-- Safe RTSP/snapshot URI handling.
-- Authenticated JPEG retrieval.
-- `ovm profiles` and `ovm snapshot`.
+- Safe presentation RTSP/snapshot URI handling with private operational queries.
+- Authenticated, bounded JPEG retrieval with atomic no-clobber output and an
+  explicit overwrite opt-in.
+- `ovm profiles` and `ovm snapshot` with shared M1 credential policy, stable
+  typed JSON envelopes, deterministic human output, cancellation, and process
+  integration tests.
+
+Current work: the Media1/Media2 wire subset, shared authenticated application
+session, normalized profile and snapshot use cases, complete synthetic fake,
+CLI commands, default profile selection, and snapshot file-safety contract are
+implemented and pass local tests. M2 remains **In progress** until the remote CI
+gate passes. Evidence is synthetic-fixture only; no physical-camera verification
+or ONVIF conformance claim is made.
 
 ### M3 — Desktop Base
 

@@ -32,11 +32,12 @@ workflow. A service operation is added only with all of the following:
 5. a normalized application mapping outside `pkg/onvif` when UI or CLI output
    needs a stable product-level type.
 
-Tasks 4–6 established the transport, authentication, and fake-device
-foundations. Tasks 7–9 add the bounded Device inventory subset, interface-aware
-WS-Discovery, normalized application use cases, and CLI adapters. Media,
-Imaging, Events, mutation, and diagnostic-console models remain separate scoped
-tasks.
+Tasks 4–9 established the transport, authentication, fake-device, bounded
+Device inventory, interface-aware WS-Discovery, normalized application, and CLI
+foundations. M2 adds the bounded Media1/Media2 read subset, per-operation
+fallback, normalized profile and snapshot DTOs, and authenticated JPEG
+retrieval. Imaging, Events, mutation, and diagnostic-console models remain
+separate scoped tasks.
 
 ### SOAP transport model
 
@@ -75,12 +76,13 @@ bounded on a valid UTF-8 boundary, and stored only in sanitized form. Parser
 errors exposed to users are fixed categories. The operation payload remains
 available to the next typed service decoder.
 
-The fake device validates only the supported Device operations' immediate WSDL
-request-wrapper structure: empty wrappers, `GetCapabilities` category children,
-and the required `GetServices` boolean child. It also emits modeled capability
-categories in schema sequence. This is not a claim of complete WSDL/XSD
-validation or complete operation semantics; synthetic state operations retain
-their separately documented contract.
+The fake device validates the supported Device, Media1, and Media2 operations'
+immediate WSDL request-wrapper structure, required children, typed profile and
+configuration references, and bounded synthetic JPEG endpoint. It emits modeled
+responses in schema order and can inject supported fault classes and
+`ActionNotSupported` behavior. This is not a claim of complete WSDL/XSD
+validation, RTSP serving, or complete operation semantics; synthetic state
+operations retain their separately documented contract.
 
 The downstream typed decoder in `pkg/onvif/device` also enforces independent
 aggregate decoded-text, attribute-data, and weighted-complexity caps in addition
@@ -96,7 +98,9 @@ recorded directly rather than vendoring specification text.
 |---|---|---|
 | ONVIF core | [ONVIF Core Specification](https://www.onvif.org/specs/core/ONVIF-Core-Specification.pdf) | SOAP binding, faults, security profile, and service conventions |
 | Device service | [ONVIF Device Management WSDL](https://www.onvif.org/ver10/device/wsdl/devicemgmt.wsdl) | Device action and element provenance, beginning with system time |
-| Shared types | [ONVIF schema](https://www.onvif.org/ver10/schema/onvif.xsd) | Shared date/time, capability, scope, service-version, and network types |
+| Media1 service | [ONVIF Media WSDL](https://www.onvif.org/ver10/media/wsdl/media.wsdl) | Media ver10 profiles, sources, encoder configurations/options, stream URI, and snapshot URI |
+| Media2 service | [ONVIF Media2 WSDL](https://www.onvif.org/ver20/media/wsdl/media.wsdl) | Media ver20 profiles, encoder configurations/options, stream URI, and snapshot URI |
+| Shared types | [ONVIF schema](https://www.onvif.org/ver10/schema/onvif.xsd) | Shared date/time, capability, scope, service-version, network, and media configuration types |
 | Remote discovery | [ONVIF Remote Discovery WSDL](https://www.onvif.org/ver10/network/wsdl/remotediscovery.wsdl) | ONVIF discovery service and `NetworkVideoTransmitter` provenance |
 | WS-Discovery | [WS-Discovery 2005/04](https://specs.xmlsoap.org/ws/2005/04/discovery/ws-discovery.pdf) and [OASIS WS-Discovery 1.1](https://docs.oasis-open.org/ws-dd/discovery/1.1/os/wsdd-discovery-1.1-spec-os.html) | Probe/ProbeMatches, correlation, multicast target, Hello/Bye, and accepted namespace families |
 | WS-Addressing | [WS-Addressing 2004 submission](https://www.w3.org/Submission/2004/SUBM-ws-addressing-20040810/) and [W3C WS-Addressing 1.0 Core](https://www.w3.org/TR/ws-addr-core/) | EndpointReference, Action, MessageID, and RelatesTo handling |

@@ -6,6 +6,10 @@ export function AddManualDevice(arg1) {
   return window['go']['main']['App']['AddManualDevice'](arg1)
 }
 
+export function ApplyEncoder(arg1) {
+  return window['go']['main']['App']['ApplyEncoder'](arg1)
+}
+
 export function AuthenticateDevice(arg1) {
   return window['go']['main']['App']['AuthenticateDevice'](arg1)
 }
@@ -48,6 +52,10 @@ export function PreviewStats(arg1) {
 
 export function ProbeStream(arg1) {
   return window['go']['main']['App']['ProbeStream'](arg1)
+}
+
+export function ReadEncoder(arg1) {
+  return window['go']['main']['App']['ReadEncoder'](arg1)
 }
 
 export function RevealClip(arg1) {

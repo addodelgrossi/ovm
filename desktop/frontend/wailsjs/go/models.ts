@@ -389,6 +389,245 @@ export namespace app {
       this.detail = source['detail']
     }
   }
+  export class FieldChange {
+    field: string
+    before: string
+    requested: string
+    after: string
+
+    static createFrom(source: any = {}) {
+      return new FieldChange(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.field = source['field']
+      this.before = source['before']
+      this.requested = source['requested']
+      this.after = source['after']
+    }
+  }
+  export class MutationReport {
+    outcome: string
+    changes: FieldChange[]
+
+    static createFrom(source: any = {}) {
+      return new MutationReport(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.outcome = source['outcome']
+      this.changes = this.convertValues(source['changes'], FieldChange)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class EncoderSettings {
+    configuration_token: string
+    source: string
+    encoding: string
+    width: number
+    height: number
+    frame_rate: number
+    bitrate_kbps: number
+    gop_length: number
+    codec_profile: string
+
+    static createFrom(source: any = {}) {
+      return new EncoderSettings(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.configuration_token = source['configuration_token']
+      this.source = source['source']
+      this.encoding = source['encoding']
+      this.width = source['width']
+      this.height = source['height']
+      this.frame_rate = source['frame_rate']
+      this.bitrate_kbps = source['bitrate_kbps']
+      this.gop_length = source['gop_length']
+      this.codec_profile = source['codec_profile']
+    }
+  }
+  export class EncoderApplyResult {
+    profile_token: string
+    before: EncoderSettings
+    after: EncoderSettings
+    report: MutationReport
+
+    static createFrom(source: any = {}) {
+      return new EncoderApplyResult(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.profile_token = source['profile_token']
+      this.before = this.convertValues(source['before'], EncoderSettings)
+      this.after = this.convertValues(source['after'], EncoderSettings)
+      this.report = this.convertValues(source['report'], MutationReport)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class EncoderChange {
+    encoding: string
+    width: number
+    height: number
+    frame_rate: number
+    bitrate_kbps: number
+    gop_length: number
+    codec_profile: string
+
+    static createFrom(source: any = {}) {
+      return new EncoderChange(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.encoding = source['encoding']
+      this.width = source['width']
+      this.height = source['height']
+      this.frame_rate = source['frame_rate']
+      this.bitrate_kbps = source['bitrate_kbps']
+      this.gop_length = source['gop_length']
+      this.codec_profile = source['codec_profile']
+    }
+  }
+  export class ResolutionDTO {
+    width: number
+    height: number
+
+    static createFrom(source: any = {}) {
+      return new ResolutionDTO(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.width = source['width']
+      this.height = source['height']
+    }
+  }
+  export class EncoderCodecOptions {
+    encoding: string
+    resolutions: ResolutionDTO[]
+    frame_rates: number[]
+    frame_rate_min: number
+    frame_rate_max: number
+    bitrate_min: number
+    bitrate_max: number
+    gop_min: number
+    gop_max: number
+    profiles: string[]
+
+    static createFrom(source: any = {}) {
+      return new EncoderCodecOptions(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.encoding = source['encoding']
+      this.resolutions = this.convertValues(
+        source['resolutions'],
+        ResolutionDTO
+      )
+      this.frame_rates = source['frame_rates']
+      this.frame_rate_min = source['frame_rate_min']
+      this.frame_rate_max = source['frame_rate_max']
+      this.bitrate_min = source['bitrate_min']
+      this.bitrate_max = source['bitrate_max']
+      this.gop_min = source['gop_min']
+      this.gop_max = source['gop_max']
+      this.profiles = source['profiles']
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+
+  export class EncoderView {
+    profile_token: string
+    current: EncoderSettings
+    codecs: EncoderCodecOptions[]
+
+    static createFrom(source: any = {}) {
+      return new EncoderView(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.profile_token = source['profile_token']
+      this.current = this.convertValues(source['current'], EncoderSettings)
+      this.codecs = this.convertValues(source['codecs'], EncoderCodecOptions)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+
   export class HostInterfaceDTO {
     index: number
     name: string
@@ -689,6 +928,7 @@ export namespace app {
       this.complete = source['complete']
     }
   }
+
   export class ScanConflict {
     endpoint_reference?: string
     endpoint?: string
@@ -843,6 +1083,40 @@ export namespace main {
       if ('string' === typeof source) source = JSON.parse(source)
       this.endpoint = source['endpoint']
       this.display_name = source['display_name']
+    }
+  }
+  export class ApplyEncoderRequest {
+    device_id: string
+    profile_token: string
+    change: app.EncoderChange
+
+    static createFrom(source: any = {}) {
+      return new ApplyEncoderRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.device_id = source['device_id']
+      this.profile_token = source['profile_token']
+      this.change = this.convertValues(source['change'], app.EncoderChange)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
     }
   }
   export class AuthenticateDeviceRequest {
@@ -1056,6 +1330,84 @@ export namespace main {
     constructor(source: any = {}) {
       if ('string' === typeof source) source = JSON.parse(source)
       this.result = this.convertValues(source['result'], app.DeviceDTO)
+      this.error = this.convertValues(source['error'], BindingError)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class EncoderApplyResponse {
+    result?: app.EncoderApplyResult
+    error?: BindingError
+
+    static createFrom(source: any = {}) {
+      return new EncoderApplyResponse(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.result = this.convertValues(source['result'], app.EncoderApplyResult)
+      this.error = this.convertValues(source['error'], BindingError)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class EncoderRequest {
+    device_id: string
+    profile_token: string
+
+    static createFrom(source: any = {}) {
+      return new EncoderRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.device_id = source['device_id']
+      this.profile_token = source['profile_token']
+    }
+  }
+  export class EncoderViewResponse {
+    result?: app.EncoderView
+    error?: BindingError
+
+    static createFrom(source: any = {}) {
+      return new EncoderViewResponse(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.result = this.convertValues(source['result'], app.EncoderView)
       this.error = this.convertValues(source['error'], BindingError)
     }
 

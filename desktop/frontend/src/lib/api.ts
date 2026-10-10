@@ -1,5 +1,6 @@
 import {
   AddManualDevice,
+  ApplyEncoder,
   AuthenticateDevice,
   Bootstrap,
   BuildInfo as ReadBuildInfo,
@@ -10,6 +11,7 @@ import {
   LoadProfiles,
   OpenInVLC,
   PreviewStats as ReadPreviewStats,
+  ReadEncoder,
   ProbeStream,
   RevealClip,
   Scan,
@@ -21,6 +23,7 @@ import {
   StopPreview,
   UpdatePreferences
 } from '../../wailsjs/go/main/App.js'
+import { main } from '../../wailsjs/go/models'
 import {
   ClipboardSetText,
   WindowFullscreen,
@@ -29,7 +32,7 @@ import {
 
 export type Locale = 'en' | 'pt-BR'
 export type Theme = 'system' | 'light' | 'dark'
-export type Tab = 'overview' | 'streams' | 'live'
+export type Tab = 'overview' | 'streams' | 'live' | 'settings'
 export type Transport = 'tcp' | 'udp'
 
 export interface ApiError {
@@ -110,6 +113,74 @@ export interface ProbeResult {
   lost_packets: number
   duration_ms: number
   complete: boolean
+}
+
+export interface Resolution {
+  width: number
+  height: number
+}
+
+export interface EncoderSettings {
+  configuration_token: string
+  source: string
+  encoding: string
+  width: number
+  height: number
+  frame_rate: number
+  bitrate_kbps: number
+  gop_length: number
+  codec_profile: string
+}
+
+export interface EncoderCodecOptions {
+  encoding: string
+  resolutions: Resolution[] | null
+  frame_rates: number[] | null
+  frame_rate_min: number
+  frame_rate_max: number
+  bitrate_min: number
+  bitrate_max: number
+  gop_min: number
+  gop_max: number
+  profiles: string[] | null
+}
+
+export interface EncoderView {
+  profile_token: string
+  current: EncoderSettings
+  codecs: EncoderCodecOptions[] | null
+}
+
+export interface EncoderChange {
+  encoding: string
+  width: number
+  height: number
+  frame_rate: number
+  bitrate_kbps: number
+  gop_length: number
+  codec_profile: string
+}
+
+// MutationOutcome is 'exact', 'adjusted', 'not_applied', or 'disconnected'.
+export type MutationOutcome = string
+
+export interface FieldChange {
+  field: string
+  before: string
+  requested: string
+  after: string
+}
+
+export interface MutationReport {
+  outcome: MutationOutcome
+  changes: FieldChange[] | null
+}
+
+export interface EncoderApplyResult {
+  profile_token: string
+  before: EncoderSettings
+  after: EncoderSettings
+  report: MutationReport
 }
 
 export interface RecordingResult {
@@ -364,6 +435,15 @@ export interface OvmApi {
     durationSeconds: number
   ): Promise<ApiResponse<ProbeResult>>
   revealClip(path: string): Promise<ApiResponse<{ completed: boolean }>>
+  readEncoder(
+    deviceId: string,
+    profileToken: string
+  ): Promise<ApiResponse<EncoderView>>
+  applyEncoder(
+    deviceId: string,
+    profileToken: string,
+    change: EncoderChange
+  ): Promise<ApiResponse<EncoderApplyResult>>
   startRecording(sessionId: string): Promise<ApiResponse<RecordingResult>>
   stopRecording(sessionId: string): Promise<ApiResponse<RecordingResult>>
 }
@@ -462,6 +542,20 @@ export const api: OvmApi = {
         transport,
         duration_seconds: durationSeconds
       })
+    ),
+  readEncoder: (deviceId, profileToken) =>
+    invoke<EncoderView>(() =>
+      ReadEncoder({ device_id: deviceId, profile_token: profileToken })
+    ),
+  applyEncoder: (deviceId, profileToken, change) =>
+    invoke<EncoderApplyResult>(() =>
+      ApplyEncoder(
+        main.ApplyEncoderRequest.createFrom({
+          device_id: deviceId,
+          profile_token: profileToken,
+          change
+        })
+      )
     ),
   revealClip: (path) =>
     invoke<{ completed: boolean }>(() => RevealClip({ path })),

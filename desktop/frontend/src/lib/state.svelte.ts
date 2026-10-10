@@ -230,7 +230,7 @@ export class AppState {
 
   async activateTab(tab: Tab): Promise<void> {
     this.activeTab = tab
-    if (tab === 'streams' && this.selectedDevice) {
+    if ((tab === 'streams' || tab === 'settings') && this.selectedDevice) {
       await this.loadProfiles(this.selectedDevice.id)
     }
     if (tab === 'live') {

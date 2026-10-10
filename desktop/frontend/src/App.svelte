@@ -7,6 +7,7 @@
   import Sidebar from './components/Sidebar.svelte'
   import StreamsView from './components/StreamsView.svelte'
   import LiveGridView from './components/LiveGridView.svelte'
+  import SettingsView from './components/SettingsView.svelte'
   import ToastRegion from './components/ToastRegion.svelte'
   import type { AuthenticateInput, Locale, Tab, Theme } from './lib/api'
   import { errorMessage, t } from './lib/i18n'
@@ -67,6 +68,11 @@
     ) {
       event.preventDefault()
       void model.activateTab('live')
+      return
+    }
+    if (key === '4' && model.selectedDevice) {
+      event.preventDefault()
+      void model.activateTab('settings')
     }
   }
 
@@ -259,6 +265,17 @@
                 {t(model.locale, 'tabs.liveShortcut')}
               </button>
             {/if}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={model.activeTab === 'settings'}
+              aria-controls="settings-panel"
+              aria-keyshortcuts="Meta+4 Control+4"
+              class:active={model.activeTab === 'settings'}
+              onclick={() => activateTab('settings')}
+            >
+              {t(model.locale, 'tabs.settingsShortcut')}
+            </button>
           </nav>
 
           {#if model.activeTab === 'overview'}
@@ -268,6 +285,10 @@
                 device={model.selectedDevice}
                 onAuthenticate={() => (authDialogOpen = true)}
               />
+            </div>
+          {:else if model.activeTab === 'settings'}
+            <div id="settings-panel" role="tabpanel">
+              <SettingsView {model} device={model.selectedDevice} />
             </div>
           {:else if model.activeTab === 'live'}
             <div id="live-panel" role="tabpanel">

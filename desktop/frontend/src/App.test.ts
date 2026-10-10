@@ -42,7 +42,9 @@ const apiMock = vi.hoisted(() => ({
   startRecording: vi.fn(),
   stopRecording: vi.fn(),
   probeStream: vi.fn(),
-  revealClip: vi.fn()
+  revealClip: vi.fn(),
+  readEncoder: vi.fn(),
+  applyEncoder: vi.fn()
 }))
 
 const liveSession = {
@@ -1117,6 +1119,114 @@ describe('App M3 integration', () => {
     expect(measurement.textContent).toContain('24.98 fps')
     expect(measurement.textContent).toContain('Lost packets 2')
     expect(measurement.textContent).toContain('Complete measurement')
+  })
+
+  it('edits the video encoder within the camera options and shows the verified result', async () => {
+    apiMock.readEncoder.mockResolvedValue({
+      data: {
+        profile_token: 'profile_main',
+        current: {
+          configuration_token: 'venc_main',
+          source: 'media2',
+          encoding: 'H265',
+          width: 1920,
+          height: 1080,
+          frame_rate: 30,
+          bitrate_kbps: 4096,
+          gop_length: 30,
+          codec_profile: 'Main'
+        },
+        codecs: [
+          {
+            encoding: 'H264',
+            resolutions: [
+              { width: 1920, height: 1080 },
+              { width: 1280, height: 720 }
+            ],
+            frame_rates: [30, 25],
+            frame_rate_min: 25,
+            frame_rate_max: 30,
+            bitrate_min: 256,
+            bitrate_max: 8192,
+            gop_min: 1,
+            gop_max: 120,
+            profiles: ['Main', 'High']
+          },
+          {
+            encoding: 'H265',
+            resolutions: [{ width: 1920, height: 1080 }],
+            frame_rates: [30],
+            frame_rate_min: 30,
+            frame_rate_max: 30,
+            bitrate_min: 256,
+            bitrate_max: 8192,
+            gop_min: 1,
+            gop_max: 120,
+            profiles: ['Main']
+          }
+        ]
+      }
+    })
+    apiMock.applyEncoder.mockResolvedValue({
+      data: {
+        profile_token: 'profile_main',
+        report: {
+          outcome: 'adjusted',
+          changes: [
+            {
+              field: 'encoding',
+              before: 'H265',
+              requested: 'H264',
+              after: 'H264'
+            },
+            {
+              field: 'bitrate_kbps',
+              before: '4096',
+              requested: '6000',
+              after: '3000'
+            }
+          ]
+        }
+      }
+    })
+    await renderReady()
+    await fireEvent.click(screen.getByRole('tab', { name: /Settings/ }))
+    expect(
+      await screen.findByRole('heading', { name: 'Video encoder' })
+    ).toBeTruthy()
+    await waitFor(() =>
+      expect(apiMock.readEncoder).toHaveBeenCalledWith(
+        'camera-front',
+        'profile_main'
+      )
+    )
+    const codec = (await screen.findByLabelText('Codec')) as HTMLSelectElement
+    expect(codec.value).toBe('H265')
+    await fireEvent.change(codec, { target: { value: 'H264' } })
+    const bitrate = screen.getByLabelText(/Bitrate limit/) as HTMLInputElement
+    await fireEvent.input(bitrate, { target: { value: '6000' } })
+    expect(screen.getByText('Supported: 256–8192 kbps')).toBeTruthy()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(apiMock.applyEncoder).toHaveBeenCalledWith(
+      'camera-front',
+      'profile_main',
+      expect.objectContaining({
+        encoding: 'H264',
+        width: 1920,
+        height: 1080,
+        bitrate_kbps: 6000,
+        codec_profile: 'Main'
+      })
+    )
+    expect(
+      await screen.findByText(
+        'The camera accepted the change but stored different values.'
+      )
+    ).toBeTruthy()
+    const table = screen.getByRole('table', { name: 'Verified changes' })
+    expect(table.textContent).toContain('3000')
+    expect(apiMock.loadProfiles).toHaveBeenLastCalledWith('camera-front')
   })
 
   it('reports missing MSE when the snapshot fallback is unavailable too', async () => {

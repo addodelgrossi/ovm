@@ -1758,3 +1758,68 @@ tbody th {
   display: grid;
   gap: 0.5rem;
 }
+
+.settings-section {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.settings-section h3 {
+  margin: 0;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.75rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.field small {
+  color: var(--muted);
+}
+
+.mutation-result {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.mutation-result p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.mutation-result[data-outcome='exact'] p {
+  color: var(--success);
+}
+
+.mutation-result[data-outcome='not_applied'] p,
+.mutation-result[data-outcome='disconnected'] p {
+  color: var(--danger);
+}
+
+.mutation-result table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.mutation-result th,
+.mutation-result td {
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.mutation-result tr[data-matches='false'] td:last-child {
+  color: var(--danger);
+  font-weight: 600;
+}

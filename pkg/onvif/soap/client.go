@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -35,7 +36,16 @@ type TraceEvent struct {
 	Duration   time.Duration
 	StatusCode int
 	Outcome    string
+	// Endpoint is the credential-free endpoint (RedactURL).
+	Endpoint string
+	// RequestXML and ResponseXML are the redacted, bounded envelopes. They
+	// are populated only when Config.TraceBodies is set.
+	RequestXML  []byte
+	ResponseXML []byte
 }
+
+// MaxTraceBodyBytes bounds each traced envelope.
+const MaxTraceBodyBytes = 64 << 10
 
 // TraceFunc receives one event per SOAP version attempt.
 type TraceFunc func(context.Context, TraceEvent)
@@ -50,6 +60,9 @@ type Config struct {
 	// growth, replay, or HTTP transport, so an over-limit request sends nothing.
 	MaxRequestBytes int64
 	Trace           TraceFunc
+	// TraceBodies adds redacted, bounded request and response envelopes to
+	// each trace event, for a diagnostic SOAP console.
+	TraceBodies bool
 }
 
 // Request contains a SOAP body fragment and optional header fragments.
@@ -77,6 +90,7 @@ type Client struct {
 	maxResponseBytes int64
 	maxRequestBytes  int64
 	trace            TraceFunc
+	traceBodies      bool
 }
 
 // NewClient constructs a SOAP client with secure redirect handling.
@@ -143,6 +157,7 @@ func NewClient(config Config) (*Client, error) {
 		maxResponseBytes: limit,
 		maxRequestBytes:  requestLimit,
 		trace:            config.Trace,
+		traceBodies:      config.TraceBodies && config.Trace != nil,
 	}, nil
 }
 
@@ -161,10 +176,11 @@ func (c *Client) Call(ctx context.Context, endpoint string, request Request) (*R
 func (c *Client) callVersion(ctx context.Context, endpoint string, request Request, version Version) (*Response, error) {
 	started := time.Now()
 	event := TraceEvent{
-		Method:  http.MethodPost,
-		Action:  RedactText(request.Action),
-		Version: version,
-		Outcome: "transport_error",
+		Method:   http.MethodPost,
+		Action:   RedactText(request.Action),
+		Version:  version,
+		Outcome:  "transport_error",
+		Endpoint: RedactURL(endpoint),
 	}
 	defer func() {
 		if c.trace == nil {
@@ -203,6 +219,9 @@ func (c *Client) callVersion(ctx context.Context, endpoint string, request Reque
 	if err != nil {
 		event.Outcome = "invalid_request"
 		return nil, err
+	}
+	if c.traceBodies {
+		event.RequestXML = traceBody(envelope)
 	}
 
 	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, parsedEndpoint.String(), bytes.NewReader(envelope))
@@ -246,6 +265,9 @@ func (c *Client) callVersion(ctx context.Context, endpoint string, request Reque
 		return nil, fmt.Errorf("close SOAP response: %w", closeErr)
 	}
 	rawXML := boundedRedacted(data, c.maxResponseBytes)
+	if c.traceBodies {
+		event.ResponseXML = traceBody(data)
+	}
 	if tooLarge {
 		event.Outcome = "response_too_large"
 		return nil, &ResponseTooLargeError{Limit: c.maxResponseBytes, HTTPStatus: httpResponse.StatusCode, RawXML: rawXML}
@@ -475,4 +497,19 @@ func isVersionFallbackEvidence(err error) bool {
 	}
 	var statusError httpStatusError
 	return errors.As(err, &statusError) && statusError.httpStatusCode() == http.StatusUnsupportedMediaType
+}
+
+// traceBody returns a redacted copy of an envelope, truncated to
+// MaxTraceBodyBytes on a UTF-8 boundary. Redaction runs on the full envelope
+// before truncation so a secret can never be split past the redactor.
+func traceBody(data []byte) []byte {
+	redacted := RedactXML(data)
+	if len(redacted) <= MaxTraceBodyBytes {
+		return redacted
+	}
+	cut := MaxTraceBodyBytes
+	for cut > 0 && !utf8.RuneStart(redacted[cut]) {
+		cut--
+	}
+	return append(redacted[:cut:cut], []byte("…")...)
 }

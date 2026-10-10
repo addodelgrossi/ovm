@@ -56,6 +56,13 @@ type interfaceFilter struct {
 	includeLoopback bool
 }
 
+// enumerateError wraps a whole-host interface-enumeration failure with a stable
+// prefix. It is the single place that frames the "enumerate interfaces" error
+// so the active-discovery path and the host-interface assessment path agree.
+func enumerateError(err error) error {
+	return fmt.Errorf("enumerate interfaces: %w", err)
+}
+
 // usableInterfaces enumerates up, IPv4-capable, multicast-capable interfaces
 // from the source and returns them sorted by index for deterministic ordering.
 // Loopback interfaces are excluded unless the filter opts in; point-to-point
@@ -63,7 +70,7 @@ type interfaceFilter struct {
 func usableInterfaces(source InterfaceSource, filter interfaceFilter) ([]Interface, error) {
 	raw, err := source.Interfaces()
 	if err != nil {
-		return nil, fmt.Errorf("enumerate interfaces: %w", err)
+		return nil, enumerateError(err)
 	}
 	var usable []Interface
 	for _, iface := range raw {
@@ -84,43 +91,62 @@ func usableInterfaces(source InterfaceSource, filter interfaceFilter) ([]Interfa
 	return usable, nil
 }
 
-// projectInterface decides whether a single interface is usable and, if so,
-// returns its stable projection.
+// interfaceFlagReason applies the flag-only portion of the WS-Discovery
+// usability policy and reports a stable reason. It is the single source of
+// truth for the flag checks, shared by projectInterface (which collapses every
+// non-usable reason into a silent skip) and by assessInterface (which reports
+// the reason). An address-independent verdict of ReasonUsable means the flags
+// pass and the caller must still confirm at least one usable IPv4 address.
 //
 // Usability policy for WS-Discovery (interface-scoped IPv4 multicast):
 //
 //   - The interface must be up. A down interface cannot carry traffic.
-//   - The interface must advertise net.FlagMulticast. WS-Discovery is driven by
-//     IPv4 multicast to 239.255.255.250:3702; an interface that cannot do
-//     multicast can neither emit a probe to the group nor join it to observe
-//     Hello/Bye, so probing it is pointless and, on some stacks, errors. This
-//     requirement applies to EVERY usable interface, including an explicitly
-//     opted-in loopback: there is no multicast exception for loopback.
+//   - Loopback is excluded unless the filter opts in.
 //   - Point-to-point interfaces are excluded unconditionally. PPP/VPN/tunnel
 //     links are point-to-point: there is no shared L2 segment for ad-hoc
 //     multicast discovery, and probing them tends to leak discovery traffic
 //     across a VPN or simply never reach a camera. The exclusion is absolute:
 //     a named point-to-point interface is still rejected, even when it is up,
 //     multicast-flagged, and carries a usable IPv4 address.
-//   - Loopback is excluded unless the filter opts in.
-//   - The interface must carry at least one usable unicast IPv4 address.
-func projectInterface(source InterfaceSource, iface net.Interface, filter interfaceFilter) (Interface, bool, error) {
+//   - The interface must advertise net.FlagMulticast. WS-Discovery is driven by
+//     IPv4 multicast to 239.255.255.250:3702; an interface that cannot do
+//     multicast can neither emit a probe to the group nor join it to observe
+//     Hello/Bye. This requirement applies to EVERY usable interface, including
+//     an explicitly opted-in loopback: there is no multicast exception for
+//     loopback.
+//
+// The order of the checks is significant and preserved: down, then loopback,
+// then point-to-point, then multicast. It mirrors the historical ordering of
+// projectInterface so the two paths classify identically.
+func interfaceFlagReason(iface net.Interface, filter interfaceFilter) InterfaceReason {
 	if iface.Flags&net.FlagUp == 0 {
-		return Interface{}, false, nil
+		return ReasonDown
 	}
-	loopback := iface.Flags&net.FlagLoopback != 0
-	if loopback && !filter.includeLoopback {
-		return Interface{}, false, nil
+	if iface.Flags&net.FlagLoopback != 0 && !filter.includeLoopback {
+		return ReasonLoopbackExcluded
 	}
 	// Point-to-point links (PPP, VPN, tunnels) have no shared segment for
 	// ad-hoc multicast discovery; exclude them even when named.
 	if iface.Flags&net.FlagPointToPoint != 0 {
-		return Interface{}, false, nil
+		return ReasonPointToPoint
 	}
 	// Require multicast capability on EVERY usable interface, including an
 	// opted-in loopback. There is no loopback relaxation: a device that cannot
 	// multicast cannot carry WS-Discovery.
 	if iface.Flags&net.FlagMulticast == 0 {
+		return ReasonMulticastUnsupported
+	}
+	return ReasonUsable
+}
+
+// projectInterface decides whether a single interface is usable and, if so,
+// returns its stable projection. It applies the shared flag policy via
+// interfaceFlagReason and then requires at least one usable unicast IPv4
+// address. A failure to read the interface's addresses is surfaced as an error
+// so the active-discovery path treats a flaky interface as a hard failure,
+// preserving existing Discoverer and Listener behavior.
+func projectInterface(source InterfaceSource, iface net.Interface, filter interfaceFilter) (Interface, bool, error) {
+	if interfaceFlagReason(iface, filter) != ReasonUsable {
 		return Interface{}, false, nil
 	}
 	addrs, err := source.Addrs(iface)
@@ -134,9 +160,31 @@ func projectInterface(source InterfaceSource, iface net.Interface, filter interf
 	return Interface{
 		Index:    iface.Index,
 		Name:     iface.Name,
-		Loopback: loopback,
+		Loopback: iface.Flags&net.FlagLoopback != 0,
 		IPv4:     ipv4,
 	}, true, nil
+}
+
+// assessInterface applies the exact usability policy of projectInterface and
+// reports a stable reason instead of silently skipping. It never returns an
+// error: a failure to read the interface's addresses is folded into
+// ReasonAddressUnavailable so a single flaky interface cannot deny an
+// assessment of the others, and so no raw operating-system error leaks to the
+// caller. On a usable verdict it returns the usable, deterministically ordered
+// IPv4 addresses alongside ReasonUsable.
+func assessInterface(source InterfaceSource, iface net.Interface, filter interfaceFilter) ([]net.IP, InterfaceReason) {
+	if reason := interfaceFlagReason(iface, filter); reason != ReasonUsable {
+		return nil, reason
+	}
+	addrs, err := source.Addrs(iface)
+	if err != nil {
+		return nil, ReasonAddressUnavailable
+	}
+	ipv4 := usableIPv4(addrs, filter.includeLoopback)
+	if len(ipv4) == 0 {
+		return nil, ReasonNoUsableIPv4
+	}
+	return ipv4, ReasonUsable
 }
 
 // usableIPv4 extracts the usable, deterministically ordered IPv4 unicast
@@ -234,7 +282,7 @@ func resolveInterfaces(source InterfaceSource, filter interfaceFilter, name stri
 func interfacePresent(source InterfaceSource, name string) (net.Interface, bool, error) {
 	raw, err := source.Interfaces()
 	if err != nil {
-		return net.Interface{}, false, fmt.Errorf("enumerate interfaces: %w", err)
+		return net.Interface{}, false, enumerateError(err)
 	}
 	for _, iface := range raw {
 		if iface.Name == name {

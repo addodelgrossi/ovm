@@ -196,3 +196,58 @@ func redactParsedComponents(parsed *url.URL) string {
 	}
 	return clone.String()
 }
+
+// hasDecodedControl reports whether s contains an ASCII control character after
+// percent-decoding, in addition to the literal check. A path such as
+// "/onvif/%0Amedia" carries no literal control byte in its raw form, but once
+// url.Parse decodes it the newline is exposed in URL.Path; a validator that
+// only inspected the raw encoded string would miss it. This helper decodes with
+// url.PathUnescape and checks the result, so %00, %0A, %0D, and %7F are
+// rejected whether they appear literally or percent-encoded. A malformed escape
+// (which PathUnescape rejects) is also treated as a control to fail closed; the
+// callers already reject such inputs as parse errors, so this is defence in
+// depth. The input value is never echoed.
+func hasDecodedControl(s string) bool {
+	if containsControl(s) {
+		return true
+	}
+	decoded, err := url.PathUnescape(s)
+	if err != nil {
+		return true
+	}
+	return containsControl(decoded)
+}
+
+// urlHasDecodedControl reports whether any retained, request-bearing component
+// of a parsed URL contains a control character after decoding. url.Parse
+// already decodes the path into URL.Path and the fragment into URL.Fragment,
+// so those are checked directly; the query is retained in its still-encoded
+// RawQuery form for request construction, so it is decoded here before the
+// check. This closes the percent-encoded-control bypass at every boundary that
+// retains a device- or operator-supplied URL for an actual request.
+func urlHasDecodedControl(u *url.URL) bool {
+	if u == nil {
+		return true
+	}
+	// Path and RawPath: URL.Path is already decoded; RawPath (when present)
+	// preserves the original encoding and may hide an encoded control that the
+	// decoded Path also exposes, so decode-check both to be safe.
+	if containsControl(u.Path) || hasDecodedControl(u.RawPath) {
+		return true
+	}
+	if containsControl(u.Fragment) || hasDecodedControl(u.RawFragment) {
+		return true
+	}
+	// RawQuery is retained encoded for the outgoing request; decode the full
+	// raw query string and check the decoded form for controls.
+	if u.RawQuery != "" {
+		decoded, err := url.QueryUnescape(u.RawQuery)
+		if err != nil {
+			return true
+		}
+		if containsControl(decoded) {
+			return true
+		}
+	}
+	return false
+}

@@ -11,11 +11,27 @@ import (
 	"github.com/addodelgrossi/ovm/pkg/onvif/device"
 )
 
+// newTestSession builds a session wired for deterministic negotiation/resample
+// testing without a network or a real transport. The clock read is driven by an
+// injected clockCall counter. It bypasses newSession's transport construction
+// because these tests exercise only the budget/offset/resample state the
+// session owns.
+func newTestSession(creds *Credentials, sampler auth.ClockSampler, clockCall func(ctx context.Context) (device.SystemDateAndTime, error)) *session {
+	s := &session{
+		creds:     creds,
+		generator: auth.UsernameTokenGenerator{},
+		sampler:   sampler,
+		clock:     time.Now,
+	}
+	s.setClockReader(deviceReadClock(nil, clockCall))
+	return s
+}
+
 // TestChildBudgetUsesAbsoluteCapWithoutDeadline proves that without a parent
 // deadline the absolute cap is used.
 func TestChildBudgetUsesAbsoluteCapWithoutDeadline(t *testing.T) {
-	s := &authDeviceSeam{clock: time.Now}
-	ctx, cancel := s.childBudget(context.Background(), negotiationMaxBudget, negotiationBudgetFraction)
+	seam := &authDeviceSeam{session: &session{clock: time.Now}}
+	ctx, cancel := seam.childBudget(context.Background(), negotiationMaxBudget, negotiationBudgetFraction)
 	defer cancel()
 	deadline, ok := ctx.Deadline()
 	if !ok {
@@ -31,10 +47,10 @@ func TestChildBudgetUsesAbsoluteCapWithoutDeadline(t *testing.T) {
 // the parent deadline leaves only a small remaining budget relative to the
 // absolute cap.
 func TestChildBudgetUsesFractionOfRemaining(t *testing.T) {
-	s := &authDeviceSeam{clock: time.Now}
+	seam := &authDeviceSeam{session: &session{clock: time.Now}}
 	parent, parentCancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer parentCancel()
-	ctx, cancel := s.childBudget(parent, resampleMaxBudget, resampleBudgetFraction)
+	ctx, cancel := seam.childBudget(parent, resampleMaxBudget, resampleBudgetFraction)
 	defer cancel()
 	deadline, ok := ctx.Deadline()
 	if !ok {
@@ -50,11 +66,7 @@ func TestChildBudgetUsesFractionOfRemaining(t *testing.T) {
 // TestResampleForRetryRunsAtMostOnce proves the shared resample executes a
 // single time even when many goroutines invoke it concurrently.
 func TestResampleForRetryRunsAtMostOnce(t *testing.T) {
-	s := &authDeviceSeam{
-		creds:   &Credentials{username: "u", password: "p"},
-		sampler: auth.ClockSampler{Attempts: 1, Now: time.Now},
-		clock:   time.Now,
-	}
+	s := newTestSession(&Credentials{username: "u", password: "p"}, auth.ClockSampler{Attempts: 1, Now: time.Now}, nil)
 	var ran int32
 	done := make(chan struct{})
 	const n = 16
@@ -76,11 +88,9 @@ func TestResampleForRetryRunsAtMostOnce(t *testing.T) {
 // (and leaves offset state untouched) when the parent context is already
 // cancelled, exercising the fallback path without touching the client.
 func TestResampleHonoursExpiredParent(t *testing.T) {
-	s := &authDeviceSeam{
-		creds:   &Credentials{username: "u", password: "p"},
-		sampler: auth.ClockSampler{Attempts: 1, Now: time.Now},
-		clock:   time.Now,
-	}
+	s := newTestSession(&Credentials{username: "u", password: "p"}, auth.ClockSampler{Attempts: 1, Now: time.Now}, func(ctx context.Context) (device.SystemDateAndTime, error) {
+		return device.SystemDateAndTime{}, ctx.Err()
+	})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	done := make(chan struct{})
@@ -108,20 +118,16 @@ func TestResampleHonoursExpiredParent(t *testing.T) {
 func TestInitialNegotiationUsesBoundedBudgetAndAttemptCount(t *testing.T) {
 	var calls int32
 	var latestDeadline time.Time
-	seam := &authDeviceSeam{
-		creds:   &Credentials{username: "u", password: "p"},
-		sampler: auth.ClockSampler{Attempts: negotiationAttempts, Now: time.Now},
-		clock:   time.Now,
-		clockCall: func(ctx context.Context) (device.SystemDateAndTime, error) {
-			atomic.AddInt32(&calls, 1)
-			deadline, ok := ctx.Deadline()
-			if !ok {
-				t.Fatal("initial negotiation query has no child deadline")
-			}
-			latestDeadline = deadline
-			return device.SystemDateAndTime{}, errors.New("synthetic clock failure")
-		},
-	}
+	s := newTestSession(&Credentials{username: "u", password: "p"}, auth.ClockSampler{Attempts: negotiationAttempts, Now: time.Now}, func(ctx context.Context) (device.SystemDateAndTime, error) {
+		atomic.AddInt32(&calls, 1)
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			t.Fatal("initial negotiation query has no child deadline")
+		}
+		latestDeadline = deadline
+		return device.SystemDateAndTime{}, errors.New("synthetic clock failure")
+	})
+	seam := &authDeviceSeam{session: s}
 	parent, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	started := time.Now()
@@ -132,7 +138,7 @@ func TestInitialNegotiationUsesBoundedBudgetAndAttemptCount(t *testing.T) {
 	if budget := latestDeadline.Sub(started); budget <= 0 || budget > negotiationMaxBudget+100*time.Millisecond {
 		t.Fatalf("initial negotiation budget = %v, want <= %v", budget, negotiationMaxBudget)
 	}
-	if seam.haveOffset {
+	if s.haveOffset {
 		t.Fatal("failed negotiation must not publish a clock offset")
 	}
 }

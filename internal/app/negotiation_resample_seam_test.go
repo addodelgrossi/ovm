@@ -14,17 +14,14 @@ import (
 	"github.com/addodelgrossi/ovm/pkg/onvif/soap"
 )
 
-// newResampleSeam builds an authDeviceSeam wired for deterministic resample
-// testing: credentials are present (so the retry path is active) and the clock
-// read is driven by an injected counter instead of a device or network.
+// newResampleSeam builds an authDeviceSeam backed by an injected session wired
+// for deterministic resample testing: credentials are present (so the retry
+// path is active) and the clock read is driven by an injected counter instead
+// of a device or network. The seam is a thin delegate; the offset/resample
+// state it exercises lives in the shared session.
 func newResampleSeam(clockCall func(ctx context.Context) (device.SystemDateAndTime, error)) *authDeviceSeam {
-	return &authDeviceSeam{
-		creds:     &Credentials{username: "u", password: "p"},
-		generator: auth.UsernameTokenGenerator{},
-		sampler:   auth.ClockSampler{Attempts: 1, Now: time.Now},
-		clock:     time.Now,
-		clockCall: clockCall,
-	}
+	s := newTestSession(&Credentials{username: "u", password: "p"}, auth.ClockSampler{Attempts: 1, Now: time.Now}, clockCall)
+	return &authDeviceSeam{session: s}
 }
 
 // notAuthorizedThenOK returns an invoke function that fails the first attempt of
@@ -118,12 +115,10 @@ func TestNotAuthorizedCausesExactlyOneSharedResampleAndOneRetryPerOp(t *testing.
 	}
 }
 
-// TestParentCancellationDuringResampleWinsNoSuccessfulRetry proves that when the
-// parent context is cancelled while the shared resample runs, cancellation wins:
-// the resample seam observes the cancelled context and the fresh-token retry
-// does not succeed. The retry attempt still happens (bounded to one), but it
-// returns the cancellation rather than a success.
-func TestParentCancellationDuringResampleWinsNoSuccessfulRetry(t *testing.T) {
+// TestParentCancellationDuringResamplePreventsRetry proves that when the
+// parent context is cancelled while the shared resample runs, cancellation
+// wins and the retry callback is never entered.
+func TestParentCancellationDuringResamplePreventsRetry(t *testing.T) {
 	parent, cancel := context.WithCancel(context.Background())
 
 	var resamples int32
@@ -137,32 +132,29 @@ func TestParentCancellationDuringResampleWinsNoSuccessfulRetry(t *testing.T) {
 
 	seam := newResampleSeam(clockCall)
 
-	// The invoke always rejects with NotAuthorized on the first attempt; on the
-	// retry it honours the context, so a cancelled parent yields no success.
+	// The invoke rejects with NotAuthorized on the first attempt. A retry would
+	// ignore the context and succeed, so the session itself must suppress it.
 	var attempts int32
-	invoke := func(ctx context.Context, _ []device.RequestOptions) error {
+	invoke := func(context.Context, []device.RequestOptions) error {
 		if atomic.AddInt32(&attempts, 1) == 1 {
 			return soap.ErrNotAuthorized
-		}
-		if err := ctx.Err(); err != nil {
-			return err
 		}
 		return nil
 	}
 
 	err := seam.call(parent, invoke)
 	if err == nil {
-		t.Fatal("expected the retry to fail because the parent was cancelled during resample")
+		t.Fatal("expected cancellation to prevent the retry")
 	}
 	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("retry error = %v, want context.Canceled (cancellation wins)", err)
+		t.Fatalf("error = %v, want context.Canceled (cancellation wins)", err)
 	}
 	// The resample seam was entered exactly once.
 	if got := atomic.LoadInt32(&resamples); got != 1 {
 		t.Fatalf("resample entered %d times, want exactly 1", got)
 	}
-	// Exactly two attempts total: the first failure plus one bounded retry.
-	if got := atomic.LoadInt32(&attempts); got != 2 {
-		t.Fatalf("made %d attempts, want 2 (first failure + one retry)", got)
+	// The callback ran only for the original NotAuthorized attempt.
+	if got := atomic.LoadInt32(&attempts); got != 1 {
+		t.Fatalf("made %d attempts, want 1 (retry suppressed)", got)
 	}
 }

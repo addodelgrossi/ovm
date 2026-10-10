@@ -15,6 +15,14 @@ export function ApplyImaging(
   arg1: main.ApplyImagingRequest
 ): Promise<main.ImagingApplyResponse>
 
+export function ApplyNetwork(
+  arg1: main.ApplyNetworkRequest
+): Promise<main.NetworkApplyResponse>
+
+export function ApplyTime(
+  arg1: main.ApplyTimeRequest
+): Promise<main.TimeApplyResponse>
+
 export function AuthenticateDevice(
   arg1: main.AuthenticateDeviceRequest
 ): Promise<main.AuthenticateDeviceResponse>
@@ -24,6 +32,14 @@ export function Bootstrap(): Promise<main.BootstrapResponse>
 export function BuildInfo(): Promise<buildinfo.Info>
 
 export function CancelScan(): Promise<main.CancelScanResponse>
+
+export function CreateUser(
+  arg1: main.UserChangeRequest
+): Promise<main.UsersApplyResponse>
+
+export function DeleteUser(
+  arg1: main.DeleteUserRequest
+): Promise<main.UsersApplyResponse>
 
 export function ForgetDevice(
   arg1: main.DeviceIDRequest
@@ -59,6 +75,22 @@ export function ReadImaging(
   arg1: main.EncoderRequest
 ): Promise<main.ImagingViewResponse>
 
+export function ReadNetwork(
+  arg1: main.DeviceIDOnlyRequest
+): Promise<main.NetworkViewResponse>
+
+export function ReadTime(
+  arg1: main.DeviceIDOnlyRequest
+): Promise<main.TimeViewResponse>
+
+export function ReadUsers(
+  arg1: main.DeviceIDOnlyRequest
+): Promise<main.UsersViewResponse>
+
+export function Reboot(
+  arg1: main.DeviceIDOnlyRequest
+): Promise<main.MaintenanceResponse>
+
 export function RevealClip(
   arg1: main.RevealClipRequest
 ): Promise<main.ActionResponse>
@@ -68,6 +100,14 @@ export function Scan(arg1: main.ScanRequest): Promise<main.ScanResponse>
 export function SelectDevice(
   arg1: main.DeviceIDRequest
 ): Promise<main.OverviewResponse>
+
+export function SetUser(
+  arg1: main.UserChangeRequest
+): Promise<main.UsersApplyResponse>
+
+export function SoftFactoryReset(
+  arg1: main.FactoryResetRequest
+): Promise<main.MaintenanceResponse>
 
 export function StartPreview(
   arg1: main.StartPreviewRequest
@@ -88,6 +128,10 @@ export function StopPreview(
 export function StopRecording(
   arg1: main.RecordingRequest
 ): Promise<main.RecordingResponse>
+
+export function SystemLog(
+  arg1: main.SystemLogRequest
+): Promise<main.SystemLogResponse>
 
 export function UpdatePreferences(
   arg1: main.UpdatePreferencesRequest

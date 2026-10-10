@@ -14,6 +14,14 @@ export function ApplyImaging(arg1) {
   return window['go']['main']['App']['ApplyImaging'](arg1)
 }
 
+export function ApplyNetwork(arg1) {
+  return window['go']['main']['App']['ApplyNetwork'](arg1)
+}
+
+export function ApplyTime(arg1) {
+  return window['go']['main']['App']['ApplyTime'](arg1)
+}
+
 export function AuthenticateDevice(arg1) {
   return window['go']['main']['App']['AuthenticateDevice'](arg1)
 }
@@ -28,6 +36,14 @@ export function BuildInfo() {
 
 export function CancelScan() {
   return window['go']['main']['App']['CancelScan']()
+}
+
+export function CreateUser(arg1) {
+  return window['go']['main']['App']['CreateUser'](arg1)
+}
+
+export function DeleteUser(arg1) {
+  return window['go']['main']['App']['DeleteUser'](arg1)
 }
 
 export function ForgetDevice(arg1) {
@@ -66,6 +82,22 @@ export function ReadImaging(arg1) {
   return window['go']['main']['App']['ReadImaging'](arg1)
 }
 
+export function ReadNetwork(arg1) {
+  return window['go']['main']['App']['ReadNetwork'](arg1)
+}
+
+export function ReadTime(arg1) {
+  return window['go']['main']['App']['ReadTime'](arg1)
+}
+
+export function ReadUsers(arg1) {
+  return window['go']['main']['App']['ReadUsers'](arg1)
+}
+
+export function Reboot(arg1) {
+  return window['go']['main']['App']['Reboot'](arg1)
+}
+
 export function RevealClip(arg1) {
   return window['go']['main']['App']['RevealClip'](arg1)
 }
@@ -76,6 +108,14 @@ export function Scan(arg1) {
 
 export function SelectDevice(arg1) {
   return window['go']['main']['App']['SelectDevice'](arg1)
+}
+
+export function SetUser(arg1) {
+  return window['go']['main']['App']['SetUser'](arg1)
+}
+
+export function SoftFactoryReset(arg1) {
+  return window['go']['main']['App']['SoftFactoryReset'](arg1)
 }
 
 export function StartPreview(arg1) {
@@ -96,6 +136,10 @@ export function StopPreview(arg1) {
 
 export function StopRecording(arg1) {
   return window['go']['main']['App']['StopRecording'](arg1)
+}
+
+export function SystemLog(arg1) {
+  return window['go']['main']['App']['SystemLog'](arg1)
 }
 
 export function UpdatePreferences(arg1) {

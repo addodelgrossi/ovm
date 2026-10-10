@@ -4,6 +4,10 @@
   import type { AppState } from '../lib/state.svelte'
   import EncoderSettings from './settings/EncoderSettings.svelte'
   import ImageSettings from './settings/ImageSettings.svelte'
+  import MaintenanceSettings from './settings/MaintenanceSettings.svelte'
+  import NetworkSettings from './settings/NetworkSettings.svelte'
+  import TimeSettings from './settings/TimeSettings.svelte'
+  import UsersSettings from './settings/UsersSettings.svelte'
 
   let { model, device }: { model: AppState; device: Device } = $props()
 
@@ -58,4 +62,15 @@
       />
     {/key}
   {/if}
+
+  {#key device.id}
+    <TimeSettings locale={model.locale} deviceId={device.id} />
+    <UsersSettings locale={model.locale} deviceId={device.id} />
+    <NetworkSettings
+      locale={model.locale}
+      deviceId={device.id}
+      onMoved={() => void model.refresh()}
+    />
+    <MaintenanceSettings locale={model.locale} deviceId={device.id} />
+  {/key}
 </section>

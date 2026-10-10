@@ -46,7 +46,18 @@ const apiMock = vi.hoisted(() => ({
   readEncoder: vi.fn(),
   applyEncoder: vi.fn(),
   readImaging: vi.fn(),
-  applyImaging: vi.fn()
+  applyImaging: vi.fn(),
+  readTime: vi.fn(),
+  applyTime: vi.fn(),
+  readUsers: vi.fn(),
+  setUser: vi.fn(),
+  createUser: vi.fn(),
+  deleteUser: vi.fn(),
+  readNetwork: vi.fn(),
+  applyNetwork: vi.fn(),
+  reboot: vi.fn(),
+  softFactoryReset: vi.fn(),
+  systemLog: vi.fn()
 }))
 
 const liveSession = {
@@ -337,7 +348,20 @@ function deferred<T>(): {
   }
 }
 
+const unavailable = {
+  error: { category: 'protocol', code: 'operation_protocol', message: 'x' }
+}
+
 function setDefaultMocks(): void {
+  for (const call of [
+    apiMock.readEncoder,
+    apiMock.readImaging,
+    apiMock.readTime,
+    apiMock.readUsers,
+    apiMock.readNetwork
+  ]) {
+    call.mockResolvedValue(unavailable)
+  }
   const overview = makeOverview()
   apiMock.bootstrap.mockResolvedValue({ data: makeBootstrap(overview) })
   apiMock.buildInfo.mockResolvedValue({
@@ -1289,6 +1313,140 @@ describe('App M3 integration', () => {
     const table = screen.getByRole('table', { name: 'Verified changes' })
     expect(table.textContent).toContain('3000')
     expect(apiMock.loadProfiles).toHaveBeenLastCalledWith('camera-front')
+  })
+
+  it('sets NTP servers, warns about default credentials, and guards network and reset changes', async () => {
+    apiMock.readTime.mockResolvedValue({
+      data: {
+        date_time_type: 'Manual',
+        time_zone: 'UTC0',
+        daylight_savings: false,
+        device_utc: '2026-10-10T12:00:00Z',
+        clock_offset_seconds: 5400.4,
+        uncertainty_seconds: 1.02,
+        ntp_from_dhcp: false,
+        ntp_servers: []
+      }
+    })
+    apiMock.applyTime.mockResolvedValue({
+      data: {
+        before: {},
+        after: {
+          date_time_type: 'NTP',
+          time_zone: 'UTC0',
+          daylight_savings: false,
+          uncertainty_seconds: 1,
+          ntp_from_dhcp: false,
+          ntp_servers: ['pool.ntp.org']
+        },
+        report: { outcome: 'exact', changes: [] }
+      }
+    })
+    apiMock.readUsers.mockResolvedValue({
+      data: {
+        users: [
+          { username: 'admin', level: 'Administrator' },
+          { username: 'viewer', level: 'User' }
+        ],
+        current_username: 'admin',
+        default_credential_warning: true
+      }
+    })
+    apiMock.readNetwork.mockResolvedValue({
+      data: {
+        interface_token: 'eth0',
+        interface_name: 'eth0',
+        hw_address: '00:11:22:33:44:55',
+        dhcp: false,
+        address: '192.0.2.10',
+        prefix_length: 24,
+        gateways: ['192.0.2.1'],
+        dns_from_dhcp: false,
+        dns_servers: []
+      }
+    })
+    apiMock.applyNetwork.mockResolvedValue({
+      data: {
+        before: {},
+        report: { outcome: 'disconnected', changes: [] },
+        reboot_requested: true,
+        new_endpoint: 'http://192.0.2.77/onvif/device_service'
+      }
+    })
+    apiMock.softFactoryReset.mockResolvedValue({
+      data: { message: 'ok', back_online: true, downtime_seconds: 12 }
+    })
+    await renderReady()
+    await fireEvent.click(screen.getByRole('tab', { name: /Settings/ }))
+
+    expect(
+      await screen.findByText(/Clock offset: 5,400.4 s ± 1 s/)
+    ).toBeTruthy()
+    await fireEvent.click(screen.getByRole('radio', { name: 'NTP servers' }))
+    await fireEvent.input(screen.getByLabelText(/NTP servers \(comma/), {
+      target: { value: 'pool.ntp.org' }
+    })
+    const timeSection = screen
+      .getByRole('heading', { name: 'Date, time, and NTP' })
+      .closest('section') as HTMLElement
+    await fireEvent.click(
+      within(timeSection).getByRole('button', { name: 'Apply' })
+    )
+    expect(apiMock.applyTime).toHaveBeenCalledWith('camera-front', {
+      mode: 'NTP',
+      ntp_servers: ['pool.ntp.org'],
+      time_zone: 'UTC0',
+      daylight_savings: false
+    })
+
+    expect(await screen.findByText(/published factory default/)).toBeTruthy()
+    expect(screen.getByText('used by ovm')).toBeTruthy()
+    await fireEvent.input(screen.getByLabelText('New password'), {
+      target: { value: 'rotated-secret-9' }
+    })
+    await fireEvent.input(screen.getByLabelText('Confirm the new password'), {
+      target: { value: 'different-secret' }
+    })
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Change password' })
+    )
+    expect(await screen.findByText('The passwords do not match.')).toBeTruthy()
+    expect(apiMock.setUser).not.toHaveBeenCalled()
+
+    await fireEvent.input(screen.getByLabelText('IPv4 address'), {
+      target: { value: '192.0.2.77' }
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Review change' }))
+    const apply = screen.getByRole('button', { name: 'Apply network change' })
+    expect((apply as HTMLButtonElement).disabled).toBe(true)
+    await fireEvent.input(screen.getByLabelText('Type 192.0.2.77 to confirm'), {
+      target: { value: '192.0.2.77' }
+    })
+    await fireEvent.click(apply)
+    expect(apiMock.applyNetwork).toHaveBeenCalledWith(
+      'camera-front',
+      expect.objectContaining({ address: '192.0.2.77', prefix_length: 24 }),
+      '192.0.2.77'
+    )
+    expect(
+      await screen.findByText(/Scan the network or add it manually at/)
+    ).toBeTruthy()
+
+    const reset = screen.getByRole('button', {
+      name: 'Reset to factory settings'
+    }) as HTMLButtonElement
+    expect(reset.disabled).toBe(true)
+    await fireEvent.input(screen.getByLabelText('Type RESET'), {
+      target: { value: 'RESET' }
+    })
+    await fireEvent.click(reset)
+    expect(apiMock.softFactoryReset).toHaveBeenCalledWith(
+      'camera-front',
+      'RESET'
+    )
+    expect(
+      await screen.findByText('The camera is back online after 12 s.')
+    ).toBeTruthy()
   })
 
   it('reports missing MSE when the snapshot fallback is unavailable too', async () => {

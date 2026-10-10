@@ -2,6 +2,10 @@ import {
   AddManualDevice,
   ApplyEncoder,
   ApplyImaging,
+  ApplyNetwork,
+  ApplyTime,
+  CreateUser,
+  DeleteUser,
   AuthenticateDevice,
   Bootstrap,
   BuildInfo as ReadBuildInfo,
@@ -14,13 +18,20 @@ import {
   PreviewStats as ReadPreviewStats,
   ReadEncoder,
   ReadImaging,
+  ReadNetwork,
+  ReadTime,
+  ReadUsers,
+  Reboot,
   ProbeStream,
   RevealClip,
   Scan,
   SelectDevice,
+  SetUser,
+  SoftFactoryReset,
   StartPreview,
   StartRecording,
   StopRecording,
+  SystemLog,
   StartSnapshotPreview,
   StopPreview,
   UpdatePreferences
@@ -216,6 +227,87 @@ export interface ImagingApplyResult {
   before: ImagingSettings
   after: ImagingSettings
   report: MutationReport
+}
+
+export interface TimeView {
+  date_time_type: string
+  time_zone: string
+  daylight_savings: boolean
+  device_utc?: string
+  clock_offset_seconds?: number
+  uncertainty_seconds: number
+  ntp_from_dhcp: boolean
+  ntp_servers: string[] | null
+}
+
+export interface TimeChange {
+  mode: string
+  ntp_servers: string[]
+  time_zone: string
+  daylight_savings: boolean
+}
+
+export interface TimeApplyResult {
+  before: TimeView
+  after: TimeView
+  report: MutationReport
+}
+
+export interface CameraUser {
+  username: string
+  level: string
+}
+
+export interface UsersView {
+  users: CameraUser[] | null
+  current_username: string
+  default_credential_warning: boolean
+}
+
+export interface UsersApplyResult {
+  users: CameraUser[] | null
+  report: MutationReport
+  sign_in_verified: boolean
+}
+
+export interface NetworkView {
+  interface_token: string
+  interface_name: string
+  hw_address: string
+  dhcp: boolean
+  address: string
+  prefix_length: number
+  gateways: string[] | null
+  dns_from_dhcp: boolean
+  dns_servers: string[] | null
+}
+
+export interface NetworkChange {
+  dhcp: boolean
+  address: string
+  prefix_length: number
+  gateway: string
+  dns_servers: string[]
+}
+
+export interface NetworkApplyResult {
+  before: NetworkView
+  after?: NetworkView
+  report: MutationReport
+  reboot_requested: boolean
+  new_endpoint?: string
+}
+
+export interface MaintenanceResult {
+  message: string
+  back_online: boolean
+  downtime_seconds: number
+}
+
+export interface SystemLogResult {
+  type: string
+  text: string
+  truncated: boolean
 }
 
 export interface RecordingResult {
@@ -470,6 +562,43 @@ export interface OvmApi {
     durationSeconds: number
   ): Promise<ApiResponse<ProbeResult>>
   revealClip(path: string): Promise<ApiResponse<{ completed: boolean }>>
+  readTime(deviceId: string): Promise<ApiResponse<TimeView>>
+  applyTime(
+    deviceId: string,
+    change: TimeChange
+  ): Promise<ApiResponse<TimeApplyResult>>
+  readUsers(deviceId: string): Promise<ApiResponse<UsersView>>
+  setUser(
+    deviceId: string,
+    username: string,
+    password: string,
+    level: string
+  ): Promise<ApiResponse<UsersApplyResult>>
+  createUser(
+    deviceId: string,
+    username: string,
+    password: string,
+    level: string
+  ): Promise<ApiResponse<UsersApplyResult>>
+  deleteUser(
+    deviceId: string,
+    username: string
+  ): Promise<ApiResponse<UsersApplyResult>>
+  readNetwork(deviceId: string): Promise<ApiResponse<NetworkView>>
+  applyNetwork(
+    deviceId: string,
+    change: NetworkChange,
+    confirmation: string
+  ): Promise<ApiResponse<NetworkApplyResult>>
+  reboot(deviceId: string): Promise<ApiResponse<MaintenanceResult>>
+  softFactoryReset(
+    deviceId: string,
+    confirmation: string
+  ): Promise<ApiResponse<MaintenanceResult>>
+  systemLog(
+    deviceId: string,
+    type: string
+  ): Promise<ApiResponse<SystemLogResult>>
   readImaging(
     deviceId: string,
     profileToken: string
@@ -615,6 +744,48 @@ export const api: OvmApi = {
         })
       )
     ),
+  readTime: (deviceId) =>
+    invoke<TimeView>(() => ReadTime({ device_id: deviceId })),
+  applyTime: (deviceId, change) =>
+    invoke<TimeApplyResult>(() =>
+      ApplyTime(
+        main.ApplyTimeRequest.createFrom({ device_id: deviceId, change })
+      )
+    ),
+  readUsers: (deviceId) =>
+    invoke<UsersView>(() => ReadUsers({ device_id: deviceId })),
+  setUser: (deviceId, username, password, level) =>
+    invoke<UsersApplyResult>(() =>
+      SetUser({ device_id: deviceId, username, password, level })
+    ),
+  createUser: (deviceId, username, password, level) =>
+    invoke<UsersApplyResult>(() =>
+      CreateUser({ device_id: deviceId, username, password, level })
+    ),
+  deleteUser: (deviceId, username) =>
+    invoke<UsersApplyResult>(() =>
+      DeleteUser({ device_id: deviceId, username })
+    ),
+  readNetwork: (deviceId) =>
+    invoke<NetworkView>(() => ReadNetwork({ device_id: deviceId })),
+  applyNetwork: (deviceId, change, confirmation) =>
+    invoke<NetworkApplyResult>(() =>
+      ApplyNetwork(
+        main.ApplyNetworkRequest.createFrom({
+          device_id: deviceId,
+          change,
+          confirmation
+        })
+      )
+    ),
+  reboot: (deviceId) =>
+    invoke<MaintenanceResult>(() => Reboot({ device_id: deviceId })),
+  softFactoryReset: (deviceId, confirmation) =>
+    invoke<MaintenanceResult>(() =>
+      SoftFactoryReset({ device_id: deviceId, confirmation })
+    ),
+  systemLog: (deviceId, type) =>
+    invoke<SystemLogResult>(() => SystemLog({ device_id: deviceId, type })),
   revealClip: (path) =>
     invoke<{ completed: boolean }>(() => RevealClip({ path })),
   startRecording: (sessionId) =>

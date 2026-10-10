@@ -72,3 +72,35 @@ func liveStreamError(err error) *ManagerError {
 		return newManagerError(CategoryProtocol, "the camera stream failed", err)
 	}
 }
+
+// OpenSnapshotFeed opens a repeatable, authenticated snapshot source for the
+// selected profile, used when the viewer cannot decode the live codec.
+func (m *Manager) OpenSnapshotFeed(ctx context.Context, selection StreamSelection) (SnapshotFeed, error) {
+	if err := m.ensureOpen(); err != nil {
+		return nil, err
+	}
+	if m.snapshotFeeds == nil {
+		return nil, newManagerError(CategoryInternal, "snapshot preview is not configured", nil)
+	}
+	if err := ValidateSnapshotProfileToken(selection.ProfileToken); err != nil {
+		return nil, managerErrorFromApp(err)
+	}
+	device, resolveErr := m.resolveDevice(selection.DeviceID)
+	if resolveErr != nil {
+		return nil, resolveErr
+	}
+	request := SnapshotFeedRequest{Host: device.Endpoint, ProfileToken: selection.ProfileToken}
+	if device.CredentialReference != "" {
+		credentials, release, credErr := m.loadCredentials(ctx, device)
+		if credErr != nil {
+			return nil, credErr
+		}
+		defer release()
+		request.Credentials = credentials
+	}
+	feed, err := m.snapshotFeeds.OpenSnapshotFeed(ctx, request)
+	if err != nil {
+		return nil, managerErrorFromApp(err)
+	}
+	return feed, nil
+}

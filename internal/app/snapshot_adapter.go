@@ -532,7 +532,7 @@ func (reader *exactJPEGReader) ReadByte() (byte, error) {
 // The full decoder must consume exactly the staged bytes, so truncated images,
 // malformed scan data, format spoofing, concatenated images, and trailing data
 // are rejected with fixed, value-free protocol errors.
-func validateSnapshotJPEG(ctx context.Context, file *os.File, size int64) error {
+func validateSnapshotJPEG(ctx context.Context, file io.ReaderAt, size int64) error {
 	if err := ctx.Err(); err != nil {
 		return mapContextError(err)
 	}

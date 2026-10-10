@@ -90,3 +90,44 @@ func TestOpenLiveStreamMapsFailuresToSafeErrors(t *testing.T) {
 		}
 	}
 }
+
+type fakeSnapshotFeeds struct {
+	request SnapshotFeedRequest
+	err     error
+}
+
+func (f *fakeSnapshotFeeds) OpenSnapshotFeed(_ context.Context, request SnapshotFeedRequest) (SnapshotFeed, error) {
+	f.request = request
+	if f.err != nil {
+		return nil, f.err
+	}
+	return nil, nil
+}
+
+func TestOpenSnapshotFeedUsesDeviceEndpointAndStoredCredentials(t *testing.T) {
+	h := newHarness(t)
+	device := seedAuthenticatedStreamDevice(t, h, "192.168.44.30")
+	if _, err := h.manager.OpenSnapshotFeed(context.Background(), StreamSelection{DeviceID: device.ID, ProfileToken: "profile_main"}); err == nil {
+		t.Fatal("OpenSnapshotFeed() without a use case succeeded")
+	}
+	feeds := &fakeSnapshotFeeds{}
+	h.manager.snapshotFeeds = feeds
+	if _, err := h.manager.OpenSnapshotFeed(context.Background(), StreamSelection{DeviceID: device.ID, ProfileToken: "profile_main"}); err != nil {
+		t.Fatalf("OpenSnapshotFeed() error = %v", err)
+	}
+	if feeds.request.ProfileToken != "profile_main" || !strings.Contains(feeds.request.Host, "192.168.44.30") {
+		t.Fatalf("request = %+v", feeds.request)
+	}
+	if feeds.request.Credentials.Username() != "operator" {
+		t.Fatal("stored credentials were not supplied")
+	}
+	if _, err := h.manager.OpenSnapshotFeed(context.Background(), StreamSelection{DeviceID: device.ID, ProfileToken: ""}); err == nil {
+		t.Fatal("OpenSnapshotFeed() accepted an empty profile token")
+	}
+	feeds.err = newError(CategoryAuthentication, "authentication failed", nil)
+	_, err := h.manager.OpenSnapshotFeed(context.Background(), StreamSelection{DeviceID: device.ID, ProfileToken: "profile_main"})
+	var managed *ManagerError
+	if !errors.As(err, &managed) || managed.Category != CategoryAuthentication {
+		t.Fatalf("error = %v, want authentication", err)
+	}
+}

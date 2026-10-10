@@ -40,7 +40,8 @@ const apiMock = vi.hoisted(() => ({
   startSnapshotPreview: vi.fn(),
   setFullscreen: vi.fn(),
   startRecording: vi.fn(),
-  stopRecording: vi.fn()
+  stopRecording: vi.fn(),
+  probeStream: vi.fn()
 }))
 
 const liveSession = {
@@ -1052,6 +1053,54 @@ describe('App M3 integration', () => {
     expect(apiMock.setFullscreen).toHaveBeenCalledWith(true)
     await fireEvent.keyDown(window, { key: 'Escape' })
     expect(apiMock.setFullscreen).toHaveBeenCalledWith(false)
+  })
+
+  it('runs a 30-second stream probe and shows the measurement', async () => {
+    apiMock.bootstrap.mockResolvedValue({
+      data: makeBootstrap(makeOverview(), {
+        demo: false,
+        rtsp_playback_available: false,
+        vlc_available: false,
+        live_preview_available: true
+      })
+    })
+    apiMock.probeStream.mockResolvedValue({
+      data: {
+        profile_token: 'profile_main',
+        transport: 'tcp',
+        codec: 'h265',
+        width: 1920,
+        height: 1080,
+        frames_per_second: 24.98,
+        bitrate_kbps: 4100,
+        gop_frames: 50,
+        gop_seconds: 2,
+        time_to_first_frame_ms: 380,
+        frames: 750,
+        keyframes: 15,
+        lost_packets: 2,
+        duration_ms: 30400,
+        complete: true
+      }
+    })
+    await renderReady()
+    await fireEvent.click(screen.getByRole('tab', { name: /Streams/ }))
+    await screen.findByRole('heading', { name: 'Profile Main stream' })
+    await fireEvent.click(
+      screen.getAllByRole('button', { name: 'Probe 30 s' })[0]
+    )
+    expect(apiMock.probeStream).toHaveBeenCalledWith(
+      'camera-front',
+      'profile_main',
+      'tcp',
+      30
+    )
+    const measurement = await screen.findByLabelText('Stream probe')
+    expect(measurement.textContent).toContain('H265')
+    expect(measurement.textContent).toContain('1920 × 1080')
+    expect(measurement.textContent).toContain('24.98 fps')
+    expect(measurement.textContent).toContain('Lost packets 2')
+    expect(measurement.textContent).toContain('Complete measurement')
   })
 
   it('reports missing MSE when the snapshot fallback is unavailable too', async () => {

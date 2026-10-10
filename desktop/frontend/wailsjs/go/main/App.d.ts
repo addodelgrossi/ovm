@@ -39,6 +39,10 @@ export function PreviewStats(
   arg1: main.PreviewStatsRequest
 ): Promise<main.PreviewStatsResponse>
 
+export function ProbeStream(
+  arg1: main.ProbeStreamRequest
+): Promise<main.ProbeStreamResponse>
+
 export function Scan(arg1: main.ScanRequest): Promise<main.ScanResponse>
 
 export function SelectDevice(

@@ -10,6 +10,7 @@ import {
   LoadProfiles,
   OpenInVLC,
   PreviewStats as ReadPreviewStats,
+  ProbeStream,
   Scan,
   SelectDevice,
   StartPreview,
@@ -90,6 +91,24 @@ export interface PreviewStats {
   reconnects: number
   elapsed_ms: number
   first_frame_received: boolean
+}
+
+export interface ProbeResult {
+  profile_token: string
+  transport: string
+  codec: string
+  width: number
+  height: number
+  frames_per_second: number
+  bitrate_kbps: number
+  gop_frames: number
+  gop_seconds: number
+  time_to_first_frame_ms: number
+  frames: number
+  keyframes: number
+  lost_packets: number
+  duration_ms: number
+  complete: boolean
 }
 
 export interface RecordingResult {
@@ -337,6 +356,12 @@ export interface OvmApi {
     profileToken: string
   ): Promise<ApiResponse<PreviewSession>>
   previewStats(sessionId: string): Promise<ApiResponse<PreviewStats>>
+  probeStream(
+    deviceId: string,
+    profileToken: string,
+    transport: Transport,
+    durationSeconds: number
+  ): Promise<ApiResponse<ProbeResult>>
   startRecording(sessionId: string): Promise<ApiResponse<RecordingResult>>
   stopRecording(sessionId: string): Promise<ApiResponse<RecordingResult>>
 }
@@ -426,6 +451,15 @@ export const api: OvmApi = {
   stopPreview: (sessionId) =>
     invoke<{ completed: boolean }>(() =>
       StopPreview({ session_id: sessionId })
+    ),
+  probeStream: (deviceId, profileToken, transport, durationSeconds) =>
+    invoke<ProbeResult>(() =>
+      ProbeStream({
+        device_id: deviceId,
+        profile_token: profileToken,
+        transport,
+        duration_seconds: durationSeconds
+      })
     ),
   startRecording: (sessionId) =>
     invoke<RecordingResult>(() => StartRecording({ session_id: sessionId })),

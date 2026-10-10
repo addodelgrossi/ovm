@@ -127,6 +127,24 @@ func validateStartPreviewRequest(request StartPreviewRequest) (core.StreamSelect
 	}, nil
 }
 
+// maxDesktopProbeSeconds keeps a probe inside the binding call timeout.
+const maxDesktopProbeSeconds = 45
+
+func validateProbeStreamRequest(request ProbeStreamRequest) (core.StreamSelection, time.Duration, *BindingError) {
+	selection, err := validateOpenInVLCRequest(OpenInVLCRequest{
+		DeviceID:     request.DeviceID,
+		ProfileToken: request.ProfileToken,
+		Transport:    request.Transport,
+	})
+	if err != nil {
+		return core.StreamSelection{}, 0, err
+	}
+	if request.DurationSeconds < 1 || request.DurationSeconds > maxDesktopProbeSeconds {
+		return core.StreamSelection{}, 0, bindingValidation("invalid_probe_duration", "the probe duration must be between 1 and 45 seconds")
+	}
+	return selection, time.Duration(request.DurationSeconds) * time.Second, nil
+}
+
 // validPreviewSessionID accepts the bridge's 32-character lowercase hex IDs.
 func validPreviewSessionID(value string) bool {
 	if len(value) != 32 {

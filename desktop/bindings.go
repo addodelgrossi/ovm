@@ -152,6 +152,18 @@ type StopPreviewRequest struct {
 	SessionID string `json:"session_id"`
 }
 
+type ProbeStreamRequest struct {
+	DeviceID        string `json:"device_id"`
+	ProfileToken    string `json:"profile_token"`
+	Transport       string `json:"transport"`
+	DurationSeconds int    `json:"duration_seconds"`
+}
+
+type ProbeStreamResponse struct {
+	Result *core.ProbeResult `json:"result,omitempty"`
+	Error  *BindingError     `json:"error,omitempty"`
+}
+
 type RecordingRequest struct {
 	SessionID string `json:"session_id"`
 }
@@ -505,6 +517,26 @@ func (a *App) StopPreview(request StopPreviewRequest) ActionResponse {
 	}
 	previews.stop(request.SessionID)
 	return ActionResponse{Result: &ActionResult{Completed: true}}
+}
+
+// ProbeStream measures a profile's stream for a short, fixed duration. A
+// partial measurement accompanies an error.
+func (a *App) ProbeStream(request ProbeStreamRequest) ProbeStreamResponse {
+	selection, duration, validationErr := validateProbeStreamRequest(request)
+	if validationErr != nil {
+		return ProbeStreamResponse{Error: validationErr}
+	}
+	manager, ctx, finish, bindingErr := a.beginCall()
+	if bindingErr != nil {
+		return ProbeStreamResponse{Error: bindingErr}
+	}
+	defer finish()
+
+	result, err := manager.ProbeStream(ctx, selection, duration)
+	if err != nil {
+		return ProbeStreamResponse{Result: &result, Error: bindingErrorFrom(err)}
+	}
+	return ProbeStreamResponse{Result: &result}
 }
 
 // StartRecording records a keyframe-aligned MP4 clip of a live preview into

@@ -31,6 +31,7 @@ type Manager interface {
 	ResolveStreamURI(context.Context, core.StreamSelection) (string, error)
 	OpenLiveStream(context.Context, core.StreamSelection) (stream.LiveSource, error)
 	OpenSnapshotFeed(context.Context, core.StreamSelection) (core.SnapshotFeed, error)
+	ProbeStream(context.Context, core.StreamSelection, time.Duration) (core.ProbeResult, error)
 	UpdatePreferences(context.Context, core.PreferencesRequest) (core.Overview, error)
 	Close() error
 }

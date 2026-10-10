@@ -1753,3 +1753,8 @@ tbody th {
   font-weight: 600;
   color: var(--danger);
 }
+
+.stream-probe {
+  display: grid;
+  gap: 0.5rem;
+}

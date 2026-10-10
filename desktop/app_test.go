@@ -290,3 +290,30 @@ func TestConcurrentCallsAndShutdownAreRaceSafe(t *testing.T) {
 		t.Fatalf("Manager.Close() calls = %d, want 1", manager.callCount("close"))
 	}
 }
+
+func TestProbeStreamValidatesAndReturnsPartialResults(t *testing.T) {
+	manager := newFakeManager()
+	var gotDuration time.Duration
+	manager.probeFn = func(_ context.Context, selection core.StreamSelection, duration time.Duration) (core.ProbeResult, error) {
+		gotDuration = duration
+		return core.ProbeResult{ProfileToken: selection.ProfileToken, Frames: 5}, nil
+	}
+	app, err := NewApp(AppDependencies{Manager: manager})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	defer app.shutdown(context.Background())
+	response := app.ProbeStream(ProbeStreamRequest{DeviceID: "device-one", ProfileToken: "profile_main", Transport: "tcp", DurationSeconds: 30})
+	if response.Error != nil || response.Result.Frames != 5 || gotDuration != 30*time.Second {
+		t.Fatalf("response = %+v, duration = %v", response, gotDuration)
+	}
+	for _, request := range []ProbeStreamRequest{
+		{DeviceID: "device-one", ProfileToken: "profile_main", Transport: "tcp", DurationSeconds: 0},
+		{DeviceID: "device-one", ProfileToken: "profile_main", Transport: "tcp", DurationSeconds: 46},
+		{DeviceID: "device-one", ProfileToken: "profile_main", Transport: "sctp", DurationSeconds: 30},
+	} {
+		if response := app.ProbeStream(request); response.Error == nil || response.Error.Category != core.CategoryUsage {
+			t.Errorf("ProbeStream(%+v) = %+v, want usage error", request, response)
+		}
+	}
+}

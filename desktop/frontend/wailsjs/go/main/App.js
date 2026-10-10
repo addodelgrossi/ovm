@@ -46,6 +46,10 @@ export function PreviewStats(arg1) {
   return window['go']['main']['App']['PreviewStats'](arg1)
 }
 
+export function ProbeStream(arg1) {
+  return window['go']['main']['App']['ProbeStream'](arg1)
+}
+
 export function Scan(arg1) {
   return window['go']['main']['App']['Scan'](arg1)
 }

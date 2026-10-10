@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	core "github.com/addodelgrossi/ovm/internal/app"
 	"github.com/addodelgrossi/ovm/internal/store"
@@ -26,6 +27,7 @@ type fakeManager struct {
 	resolveFn      func(context.Context, core.StreamSelection) (string, error)
 	liveFn         func(context.Context, core.StreamSelection) (stream.LiveSource, error)
 	snapshotFeedFn func(context.Context, core.StreamSelection) (core.SnapshotFeed, error)
+	probeFn        func(context.Context, core.StreamSelection, time.Duration) (core.ProbeResult, error)
 	preferencesFn  func(context.Context, core.PreferencesRequest) (core.Overview, error)
 	closeFn        func() error
 }
@@ -152,6 +154,14 @@ func (f *fakeManager) OpenSnapshotFeed(ctx context.Context, selection core.Strea
 		return f.snapshotFeedFn(ctx, selection)
 	}
 	return nil, errors.New("snapshot feed not configured")
+}
+
+func (f *fakeManager) ProbeStream(ctx context.Context, selection core.StreamSelection, duration time.Duration) (core.ProbeResult, error) {
+	f.called("probe")
+	if f.probeFn != nil {
+		return f.probeFn(ctx, selection, duration)
+	}
+	return core.ProbeResult{}, errors.New("probe not configured")
 }
 
 func (f *fakeManager) UpdatePreferences(ctx context.Context, request core.PreferencesRequest) (core.Overview, error) {

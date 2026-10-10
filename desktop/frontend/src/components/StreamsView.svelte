@@ -10,6 +10,7 @@
   import type { AppState } from '../lib/state.svelte'
   import CopyButton from './CopyButton.svelte'
   import LivePreview from './LivePreview.svelte'
+  import StreamProbe from './StreamProbe.svelte'
 
   let { model, device }: { model: AppState; device: Device } = $props()
 
@@ -344,6 +345,11 @@
                 deviceId={device.id}
                 profileToken={profile.token}
                 profileName={profileName(profile)}
+              />
+              <StreamProbe
+                locale={model.locale}
+                deviceId={device.id}
+                profileToken={profile.token}
               />
             {/if}
 

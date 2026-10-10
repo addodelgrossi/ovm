@@ -90,3 +90,71 @@ func (a *App) ApplyEncoder(request ApplyEncoderRequest) EncoderApplyResponse {
 	}
 	return EncoderApplyResponse{Result: &result}
 }
+
+type ApplyImagingRequest struct {
+	DeviceID     string                  `json:"device_id"`
+	ProfileToken string                  `json:"profile_token"`
+	Change       core.ImagingSettingsDTO `json:"change"`
+}
+
+type ImagingViewResponse struct {
+	Result *core.ImagingView `json:"result,omitempty"`
+	Error  *BindingError     `json:"error,omitempty"`
+}
+
+type ImagingApplyResponse struct {
+	Result *core.ImagingApplyResult `json:"result,omitempty"`
+	Error  *BindingError            `json:"error,omitempty"`
+}
+
+func validateImagingChange(change core.ImagingSettingsDTO) *BindingError {
+	for _, value := range []*float64{change.Brightness, change.ColorSaturation, change.Contrast, change.Sharpness} {
+		if value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0)) {
+			return bindingValidation("invalid_imaging_change", "the image settings are not valid")
+		}
+	}
+	switch change.IrCutFilter {
+	case "", "ON", "OFF", "AUTO":
+		return nil
+	default:
+		return bindingValidation("invalid_imaging_change", "the image settings are not valid")
+	}
+}
+
+// ReadImaging returns the image settings and options of a profile's source.
+func (a *App) ReadImaging(request EncoderRequest) ImagingViewResponse {
+	if err := validateProfileSelection(request.DeviceID, request.ProfileToken); err != nil {
+		return ImagingViewResponse{Error: err}
+	}
+	manager, ctx, finish, bindingErr := a.beginCall()
+	if bindingErr != nil {
+		return ImagingViewResponse{Error: bindingErr}
+	}
+	defer finish()
+	view, err := manager.ReadImaging(ctx, request.DeviceID, request.ProfileToken)
+	if err != nil {
+		return ImagingViewResponse{Error: bindingErrorFrom(err)}
+	}
+	return ImagingViewResponse{Result: &view}
+}
+
+// ApplyImaging changes image settings, including IR cut, and reports what the
+// camera stored.
+func (a *App) ApplyImaging(request ApplyImagingRequest) ImagingApplyResponse {
+	if err := validateProfileSelection(request.DeviceID, request.ProfileToken); err != nil {
+		return ImagingApplyResponse{Error: err}
+	}
+	if err := validateImagingChange(request.Change); err != nil {
+		return ImagingApplyResponse{Error: err}
+	}
+	manager, ctx, finish, bindingErr := a.beginCall()
+	if bindingErr != nil {
+		return ImagingApplyResponse{Error: bindingErr}
+	}
+	defer finish()
+	result, err := manager.ApplyImaging(ctx, request.DeviceID, request.ProfileToken, request.Change)
+	if err != nil {
+		return ImagingApplyResponse{Result: &result, Error: bindingErrorFrom(err)}
+	}
+	return ImagingApplyResponse{Result: &result}
+}

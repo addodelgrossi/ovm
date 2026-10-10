@@ -21,6 +21,7 @@ const (
 	media1Path   = "/onvif/media_service"
 	media2Path   = "/onvif/media2_service"
 	snapshotPath = "/onvif/snapshot"
+	imagingPath  = "/onvif/imaging_service"
 )
 
 // HTTP server timeouts. They are intentionally short but ample for a loopback
@@ -48,6 +49,8 @@ type serviceURLs struct {
 	Media2 string
 	// Snapshot is the authenticated JPEG snapshot URL.
 	Snapshot string
+	// Imaging is the ONVIF Imaging ver20 service URL.
+	Imaging string
 }
 
 // fakeCamera owns a loopback IPv4 listener, a same-origin fake ONVIF device,
@@ -152,6 +155,7 @@ func deriveServiceURLs(addr net.Addr) (serviceURLs, error) {
 		Media1:   join(media1Path),
 		Media2:   join(media2Path),
 		Snapshot: join(snapshotPath),
+		Imaging:  join(imagingPath),
 	}, nil
 }
 
@@ -243,6 +247,12 @@ func demoDeviceConfig(urls serviceURLs, username, password string, rtspPort int)
 				{
 					Namespace:    "http://www.onvif.org/ver20/media/wsdl",
 					XAddr:        urls.Media2,
+					VersionMajor: 25,
+					VersionMinor: 6,
+				},
+				{
+					Namespace:    "http://www.onvif.org/ver20/imaging/wsdl",
+					XAddr:        urls.Imaging,
 					VersionMajor: 25,
 					VersionMinor: 6,
 				},

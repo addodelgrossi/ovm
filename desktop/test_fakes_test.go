@@ -30,6 +30,8 @@ type fakeManager struct {
 	probeFn        func(context.Context, core.StreamSelection, time.Duration) (core.ProbeResult, error)
 	readEncoderFn  func(context.Context, string, string) (core.EncoderView, error)
 	applyEncoderFn func(context.Context, string, string, core.EncoderChange) (core.EncoderApplyResult, error)
+	readImagingFn  func(context.Context, string, string) (core.ImagingView, error)
+	applyImagingFn func(context.Context, string, string, core.ImagingSettingsDTO) (core.ImagingApplyResult, error)
 	preferencesFn  func(context.Context, core.PreferencesRequest) (core.Overview, error)
 	closeFn        func() error
 }
@@ -180,6 +182,22 @@ func (f *fakeManager) ApplyEncoder(ctx context.Context, deviceID, profileToken s
 		return f.applyEncoderFn(ctx, deviceID, profileToken, change)
 	}
 	return core.EncoderApplyResult{}, errors.New("encoder not configured")
+}
+
+func (f *fakeManager) ReadImaging(ctx context.Context, deviceID, profileToken string) (core.ImagingView, error) {
+	f.called("read_imaging")
+	if f.readImagingFn != nil {
+		return f.readImagingFn(ctx, deviceID, profileToken)
+	}
+	return core.ImagingView{}, errors.New("imaging not configured")
+}
+
+func (f *fakeManager) ApplyImaging(ctx context.Context, deviceID, profileToken string, change core.ImagingSettingsDTO) (core.ImagingApplyResult, error) {
+	f.called("apply_imaging")
+	if f.applyImagingFn != nil {
+		return f.applyImagingFn(ctx, deviceID, profileToken, change)
+	}
+	return core.ImagingApplyResult{}, errors.New("imaging not configured")
 }
 
 func (f *fakeManager) UpdatePreferences(ctx context.Context, request core.PreferencesRequest) (core.Overview, error) {

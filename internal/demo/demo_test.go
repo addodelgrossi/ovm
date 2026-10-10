@@ -402,3 +402,14 @@ func TestEncoderChangeSwitchesTheStreamedCodec(t *testing.T) {
 		t.Fatalf("main profile codec after change = %q, want H.264", codec)
 	}
 }
+
+// TestImagingSwitchesIrCutToDay applies IR cut Day through the demo camera.
+func TestImagingSwitchesIrCutToDay(t *testing.T) {
+	env := newTestEnvironment(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	result, err := env.Manager().ApplyImaging(ctx, env.DeviceID(), "profile_main", app.ImagingSettingsDTO{IrCutFilter: "ON"})
+	if err != nil || result.Report.Outcome != app.OutcomeExact || result.After.IrCutFilter != "ON" {
+		t.Fatalf("ApplyImaging() = %+v, %v", result, err)
+	}
+}

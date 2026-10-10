@@ -34,6 +34,8 @@ type Manager interface {
 	ProbeStream(context.Context, core.StreamSelection, time.Duration) (core.ProbeResult, error)
 	ReadEncoder(context.Context, string, string) (core.EncoderView, error)
 	ApplyEncoder(context.Context, string, string, core.EncoderChange) (core.EncoderApplyResult, error)
+	ReadImaging(context.Context, string, string) (core.ImagingView, error)
+	ApplyImaging(context.Context, string, string, core.ImagingSettingsDTO) (core.ImagingApplyResult, error)
 	UpdatePreferences(context.Context, core.PreferencesRequest) (core.Overview, error)
 	Close() error
 }

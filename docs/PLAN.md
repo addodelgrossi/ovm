@@ -1,6 +1,6 @@
 # ovm v0.1.0 Implementation Plan
 
-Status: **M4 — Video complete; M5 — Configuration next**
+Status: **M5 — Configuration in progress (implemented; awaiting native validation)**
 Last updated: 2026-10-10
 
 ## Product goal
@@ -125,7 +125,7 @@ available and always report method and uncertainty. A result is
 | M2 Media | Complete | Media/Media2 reads, URLs, snapshots, `profiles`/`snapshot` | Passed locally and in GitHub Actions on macOS/Ubuntu |
 | M3 Desktop Base | Complete | Wails UI, persistence, Keychain, sidebar, Overview, Streams, demo | Discover and copy RTSP end to end |
 | M4 Video | Complete | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
-| M5 Configuration | Planned | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |
+| M5 Configuration | In progress | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |
 | M6 Diagnostics | Planned | SOAP console, Events, clock/stability, reports, Quick Setup, palette | Complete redacted reports |
 | M7 Distribution | Planned/blocked on hardware | macOS/Linux packages, CLI releases, two-camera gate, GitHub release | Physical acceptance and green release workflow |
 
@@ -231,6 +231,27 @@ previewed or recorded; Linux WebKitGTK playback has not been verified natively.
 - User administration and supplied-default-credential warnings.
 - Guarded network changes with two confirmations and reconnection.
 - Reboot, soft factory reset, and bounded system-log retrieval.
+
+Current work: every M5 change reads the current value and the camera's
+options, validates the request against them, applies it, and reads it back,
+reporting `exact`, `adjusted`, `not_applied`, or `disconnected` with a
+before/requested/after table. Implemented areas: video encoder (Media2
+`SetVideoEncoderConfiguration` preferred, Media1 with the required Multicast
+and SessionTimeout preserved), Imaging ver20 (IR cut Day/Night/Auto,
+brightness, contrast, saturation, sharpness), time and NTP (manual sync to
+this computer with a whole-second offset and stated uncertainty), accounts
+(password change verified by signing in again, stored-secret rotation, local
+factory-default warning, no self-deletion), network (IPv4 static/DHCP,
+gateway, DNS, reboot when requested, read back at the new address, stored
+endpoint updated, typed confirmation), and maintenance (reboot with recovery
+wait, soft factory reset behind a typed confirmation, bounded sanitized
+system logs). The fake device models stateful Set operations, including
+firmware that clamps or ignores values, a reboot window, and accounts that
+drive authentication; it now answers token-less `GetSystemDateAndTime` as
+the ONVIF access policy requires. Hard factory reset is intentionally not
+offered. Evidence is synthetic; real network moves cannot be simulated
+because the fake keeps its listener, so moved-endpoint recovery is tested as
+`disconnected` plus the reported endpoint.
 
 ### M6 — Diagnostics and automation
 

@@ -132,7 +132,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   RTSP server (TCP and optional UDP) used by tests and the demo, whose main
   profile now streams H.265 and other profiles H.264.
 
+- Verified camera configuration (M5): every change reads the current value
+  and the camera's options, validates against them, applies, and reads back,
+  reporting `exact`, `adjusted`, `not_applied`, or `disconnected` with a
+  per-field before/requested/after report.
+- Typed ONVIF mutations: Media2 and Media1 `SetVideoEncoderConfiguration`
+  (Multicast and SessionTimeout preserved), richer Media2 encoder options
+  (frame rates, profiles, constant bitrate), a new Imaging ver20 client (IR
+  cut, brightness, contrast, saturation, sharpness), and Device NTP, date and
+  time, accounts, IPv4 interface, gateway, DNS, reboot, factory default, and
+  system log operations.
+- Desktop Settings tab (⌘4): encoder, image and IR cut, date/time/NTP,
+  accounts, network, and maintenance sections. Network changes and factory
+  resets require a typed second confirmation that the backend enforces too.
+- Changing the password of the account ovm signs in with is verified by a new
+  sign-in and rotates the stored Keychain/Secret Service credential; a stored
+  credential that matches a published factory default is flagged (local
+  comparison only, never a login attempt).
+- A confirmed network move updates the saved camera endpoint.
+- The demo camera accepts encoder changes in both codecs (its stream follows
+  the configured codec), offers Imaging, and reboots for a few seconds.
+
 ### Changed
+
+- The fake device publishes configuration as atomic versions, models
+  accounts that drive Basic, Digest, and UsernameToken authentication, and
+  answers `GetSystemDateAndTime` without a security header as the ONVIF access
+  policy requires, so clock negotiation works against skewed cameras.
 
 - Presentation RTSP URIs (CLI `profiles`, desktop Streams, copy actions, and VLC
   launch) now keep the camera's query exactly as returned, because cameras such

@@ -111,6 +111,30 @@ XML, or UI types.
   fragment components; URI paths and opaque identity content are intentionally
   preserved and are not claimed to be secret-free.
 
+## M5 configuration boundaries
+
+- Each configuration use case (`EncoderUseCase`, `ImagingUseCase`,
+  `TimeUseCase`, `UsersUseCase`, `NetworkUseCase`, `MaintenanceUseCase`)
+  reuses the authenticated session. A mutation reads the current value and
+  options, validates the request against them before any Set, applies it,
+  and polls a read back (`readBack`) until it matches or the attempts run out.
+  `compareMutation` classifies the result as `exact`, `adjusted`,
+  `not_applied`, or `disconnected` and lists every changed field.
+- Every ONVIF call gets a fresh UsernameToken; a nonce is never reused across
+  calls.
+- Accounts: a password change on the signed-in account is read back with the
+  new credentials and verified by a fresh sign-in before the Manager rotates
+  the stored secret through the existing compensating `persistCredentials`.
+  Passwords travel inbound only and are never returned or logged.
+- Network: DNS and gateway are applied before the interface address because
+  the old address may stop answering; a requested reboot is issued; the read
+  back targets the new address; and the Manager updates the stored endpoint
+  only after the camera answered there. The desktop and the binding both
+  require the technician to retype the new address or `DHCP`.
+- Maintenance: reboot and soft reset wait for recovery with short probes kept
+  inside the desktop call budget. Hard factory reset is not exposed. System
+  logs are bounded to 256 KiB and stripped of control characters.
+
 ## M4 video boundaries
 
 - `pkg/stream` is UI-independent. `VideoSource` yields H.264 or H.265 access

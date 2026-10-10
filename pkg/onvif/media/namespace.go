@@ -48,4 +48,7 @@ const (
 	// ActionGetAudioEncoderConfigurations is the GetAudioEncoderConfigurations
 	// action URI.
 	ActionGetAudioEncoderConfigurations = Namespace + "/GetAudioEncoderConfigurations"
+	// ActionSetVideoEncoderConfiguration is the SetVideoEncoderConfiguration
+	// action URI.
+	ActionSetVideoEncoderConfiguration = Namespace + "/SetVideoEncoderConfiguration"
 )

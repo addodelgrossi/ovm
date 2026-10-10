@@ -5,11 +5,14 @@
 //
 // The package models exactly the following ONVIF ver20 Media2 operations:
 // GetProfiles, GetStreamUri, GetSnapshotUri, GetVideoEncoderConfigurations,
-// GetVideoEncoderConfigurationOptions, and GetAudioEncoderConfigurations. Each
+// GetVideoEncoderConfigurationOptions, GetAudioEncoderConfigurations, and the
+// single mutation SetVideoEncoderConfiguration. Each
 // operation uses the official Media2 WSDL target namespace
 // http://www.onvif.org/ver20/media/wsdl and an action URI of the form
 // namespace/Operation (see namespace.go). No other Media2 operations,
 // mutations, discovery, imaging, or events are implemented here.
+// SetVideoEncoderConfiguration serializes the typed configuration (including
+// Multicast) and does not round-trip vendor extension elements.
 //
 // # GetVideoSources is intentionally absent
 //

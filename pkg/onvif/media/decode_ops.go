@@ -235,6 +235,7 @@ func decodeVideoEncoderConfigurations(root *element, raw []byte) ([]VideoEncoder
 		if err := decodeConfiguredCodec(entry, &config); err != nil {
 			return nil, err
 		}
+		config.Multicast, config.SessionTimeout = decodeStreamingFields(entry)
 		configs = append(configs, config)
 	}
 	return configs, nil

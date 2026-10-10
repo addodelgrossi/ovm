@@ -152,6 +152,11 @@ func decodeVideoEncoderConfigurations(root *element, raw []byte) ([]VideoEncoder
 		if err := decodeConfiguredAttributes(entry, &config); err != nil {
 			return nil, err
 		}
+		multicast, err := decodeMulticast(entry)
+		if err != nil {
+			return nil, err
+		}
+		config.Multicast = multicast
 		configs = append(configs, config)
 	}
 	return configs, nil
@@ -218,14 +223,21 @@ func decodeVideoEncoderConfigurationOptions(root *element, raw []byte) (VideoEnc
 		if govLengthRange != nil && govLengthRange.Min <= 0 {
 			return VideoEncoderConfigurationOptions{}, fmt.Errorf("%w: GovLengthRange", ErrInvalidField)
 		}
+		frameRates, profiles, constantBitRate, err := decodeOptionAttributes(entry)
+		if err != nil {
+			return VideoEncoderConfigurationOptions{}, err
+		}
 		preserved := preservedDiagnosticXML(entry, raw)
 		result.Options = append(result.Options, VideoEncoderOption{
-			Encoding:             encoding,
-			QualityRange:         qualityRange,
-			ResolutionsAvailable: resolutions,
-			BitrateRange:         bitrateRange,
-			GovLengthRange:       govLengthRange,
-			RawXML:               preserved,
+			Encoding:                 encoding,
+			QualityRange:             qualityRange,
+			ResolutionsAvailable:     resolutions,
+			BitrateRange:             bitrateRange,
+			GovLengthRange:           govLengthRange,
+			FrameRatesSupported:      frameRates,
+			ProfilesSupported:        profiles,
+			ConstantBitRateSupported: constantBitRate,
+			RawXML:                   preserved,
 		})
 		result.OptionsXML = append(result.OptionsXML, append([]byte(nil), preserved...))
 	}

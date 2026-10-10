@@ -5,12 +5,15 @@
 //
 // The package models exactly the following ONVIF ver10 Media operations:
 // GetProfiles, GetStreamUri, GetSnapshotUri, GetVideoSources,
-// GetVideoEncoderConfigurations, GetVideoEncoderConfigurationOptions, and
-// GetAudioEncoderConfigurations. Each operation uses the official Media WSDL
+// GetVideoEncoderConfigurations, GetVideoEncoderConfigurationOptions,
+// GetAudioEncoderConfigurations, and the single mutation
+// SetVideoEncoderConfiguration. Each operation uses the official Media WSDL
 // target namespace http://www.onvif.org/ver10/media/wsdl and an action URI of
 // the form namespace/Operation (see namespace.go). No other Media operations,
 // mutations, discovery, imaging, events, or ver20 Media2 operations are
-// implemented here. The ver20 Media2 service is a separate package
+// implemented here. SetVideoEncoderConfiguration serializes the typed
+// configuration, including the required Multicast and SessionTimeout, and does
+// not round-trip vendor extension elements. The ver20 Media2 service is a separate package
 // (pkg/onvif/media2) with separate wire types.
 //
 // GetStreamUri builds a tt:StreamSetup carrying the stream kind (RTP-Unicast or

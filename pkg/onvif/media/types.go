@@ -237,8 +237,23 @@ type VideoEncoderConfiguration struct {
 	CodecProfile string
 	// HasCodecProfile reports whether a codec profile was present.
 	HasCodecProfile bool
+	// Multicast is the required tt:Multicast block, decoded so a
+	// SetVideoEncoderConfiguration round trip preserves it.
+	Multicast Multicast
+	// SessionTimeout is the required xs:duration lexical value.
+	SessionTimeout string
 	// RawXML is the bounded, credential-redacted configuration element.
 	RawXML []byte
+}
+
+// Multicast is tt:MulticastConfiguration.
+type Multicast struct {
+	// AddressType is "IPv4" or "IPv6".
+	AddressType string
+	Address     string
+	Port        int
+	TTL         int
+	AutoStart   bool
 }
 
 // VideoEncoderConfigurationOptions is the normalized, schema-validated result

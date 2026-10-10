@@ -94,7 +94,15 @@ type VideoEncoderOption struct {
 	ResolutionsAvailable []VideoResolution
 	BitrateRange         IntRange
 	GovLengthRange       *IntRange
-	RawXML               []byte
+	// FrameRatesSupported lists the frame rates the encoder accepts, from the
+	// optional FrameRatesSupported attribute; empty when not advertised.
+	FrameRatesSupported []float64
+	// ProfilesSupported lists codec profiles from the optional
+	// ProfilesSupported attribute.
+	ProfilesSupported []string
+	// ConstantBitRateSupported reports the optional attribute of that name.
+	ConstantBitRateSupported bool
+	RawXML                   []byte
 }
 
 // ProfileAssociations models the typed configuration references embedded in a
@@ -214,8 +222,22 @@ type VideoEncoderConfiguration struct {
 	Profile string
 	// HasProfile reports whether a Profile attribute was present.
 	HasProfile bool
+	// Multicast is the optional tt:Multicast block. It is decoded so a
+	// SetVideoEncoderConfiguration round trip preserves it.
+	Multicast *Multicast
 	// RawXML is the bounded, credential-redacted configuration element.
 	RawXML []byte
+}
+
+// Multicast is tt:MulticastConfiguration.
+type Multicast struct {
+	// AddressType is "IPv4" or "IPv6".
+	AddressType string
+	// Address is the IPv4 or IPv6 group address; empty when absent.
+	Address   string
+	Port      int
+	TTL       int
+	AutoStart bool
 }
 
 // VideoEncoderConfigurationOptions is the normalized result of

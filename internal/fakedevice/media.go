@@ -78,6 +78,9 @@ type MediaInventory struct {
 	// every URI remains under the fake server's origin/host.
 	SnapshotPath string
 	StreamPath   string
+	// RTSPPort is the port advertised in stream URIs; zero means 554. The demo
+	// points it at its loopback synthetic RTSP server.
+	RTSPPort int
 
 	// SnapshotQuery is an optional, synthetic query component (for example
 	// "sig=opaque-token") that the fake includes in every generated snapshot
@@ -254,6 +257,9 @@ func (m MediaInventory) withDefaults() MediaInventory {
 		m.SnapshotPath = "/onvif/snapshot"
 	} else if m.SnapshotPath[0] != '/' {
 		m.SnapshotPath = "/" + m.SnapshotPath
+	}
+	if m.RTSPPort == 0 {
+		m.RTSPPort = 554
 	}
 	if m.StreamPath == "" {
 		m.StreamPath = "/onvif/stream"

@@ -13,7 +13,7 @@ func TestMediaURIBuilderHandlesIPv6AndEscapesTokens(t *testing.T) {
 	//nolint:gosec // This is a synthetic ONVIF reference token, not a credential.
 	token := "main & sub"
 
-	stream, err := url.Parse(origin.streamURI("/live/main", token, "RtspsUnicast"))
+	stream, err := url.Parse(origin.streamURI("/live/main", 554, token, "RtspsUnicast"))
 	if err != nil {
 		t.Fatalf("parse stream URI: %v", err)
 	}

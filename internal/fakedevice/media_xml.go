@@ -70,7 +70,7 @@ func (origin requestOrigin) snapshotURI(path, profileToken, configuredQuery stri
 	return result.String()
 }
 
-func (origin requestOrigin) streamURI(path, profileToken, protocol string) string {
+func (origin requestOrigin) streamURI(path string, port int, profileToken, protocol string) string {
 	scheme := "rtsp"
 	if protocol == "RtspsUnicast" || protocol == "RtspsMulticast" {
 		scheme = "rtsps"
@@ -78,7 +78,7 @@ func (origin requestOrigin) streamURI(path, profileToken, protocol string) strin
 	parsedPath, _ := url.Parse(path)
 	result := url.URL{
 		Scheme:  scheme,
-		Host:    net.JoinHostPort(hostOnly(origin.host), "554"),
+		Host:    net.JoinHostPort(hostOnly(origin.host), strconv.Itoa(port)),
 		Path:    parsedPath.Path,
 		RawPath: parsedPath.RawPath,
 	}
@@ -491,8 +491,8 @@ func buildAudioEncoder2Configurations(config normalizedConfig, request mediaRequ
 	return `<tr2:GetAudioEncoderConfigurationsResponse>` + body + `</tr2:GetAudioEncoderConfigurationsResponse>`
 }
 
-func buildStreamURIResponse(media mediaVersion, origin requestOrigin, streamPath string, request mediaRequest) string {
-	uri := origin.streamURI(streamPath, request.profileToken, request.protocol)
+func buildStreamURIResponse(media mediaVersion, origin requestOrigin, streamPath string, rtspPort int, request mediaRequest) string {
+	uri := origin.streamURI(streamPath, rtspPort, request.profileToken, request.protocol)
 	if media == mediaVer20 {
 		return `<tr2:GetStreamUriResponse><tr2:Uri>` + escapeXML(uri) + `</tr2:Uri></tr2:GetStreamUriResponse>`
 	}

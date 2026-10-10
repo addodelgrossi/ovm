@@ -72,7 +72,7 @@ type fakeCamera struct {
 // the same-origin service URLs from the bound address, configures the fake
 // device to advertise exactly those URLs, and starts serving on a single
 // tracked goroutine. On any error it leaves no listener open.
-func newFakeCamera(username, password string) (*fakeCamera, error) {
+func newFakeCamera(username, password string, rtspPort int) (*fakeCamera, error) {
 	// Bind explicitly to the IPv4 loopback with an ephemeral port. Using the
 	// literal "127.0.0.1" (never "localhost" or "::1") guarantees an IPv4
 	// loopback socket regardless of host name resolution or IPv6 preference.
@@ -89,7 +89,7 @@ func newFakeCamera(username, password string) (*fakeCamera, error) {
 		return nil, err
 	}
 
-	device, err := fakedevice.New(demoDeviceConfig(urls, username, password))
+	device, err := fakedevice.New(demoDeviceConfig(urls, username, password, rtspPort))
 	if err != nil {
 		_ = listener.Close()
 		return nil, fmt.Errorf("configure fake device: %w", err)
@@ -199,13 +199,16 @@ func (c *fakeCamera) Close() error {
 // demoDeviceConfig assembles the fake-device configuration that advertises the
 // same-origin Device/Media1/Media2 service and capability URLs and requires a
 // modern WS-Security UsernameToken authenticated with the synthetic
-// credentials. UsernameToken works over plaintext loopback HTTP without any
+// credentials, and advertises stream URIs on the synthetic RTSP server's port.
+// UsernameToken works over plaintext loopback HTTP without any
 // Basic/legacy-Digest downgrade, so the demo keeps the secure default policy.
-func demoDeviceConfig(urls serviceURLs, username, password string) fakedevice.Config {
+func demoDeviceConfig(urls serviceURLs, username, password string, rtspPort int) fakedevice.Config {
 	return fakedevice.Config{
 		RequireUsernameToken: true,
 		Username:             username,
 		Password:             password,
+		// Stream URIs point at the demo's loopback synthetic RTSP server.
+		MediaInventory: fakedevice.MediaInventory{RTSPPort: rtspPort},
 		Inventory: fakedevice.Inventory{
 			Services: []fakedevice.ServiceData{
 				{

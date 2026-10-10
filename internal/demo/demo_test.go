@@ -112,16 +112,13 @@ func TestBootstrapOverviewProfilesEndToEnd(t *testing.T) {
 	assertNoSecretLeak(t, bootstrap, overview, result, runtimeView)
 }
 
-// TestCapabilitiesAdvertiseNoStreaming asserts that the demo explicitly
-// advertises RTSP, playback, and VLC as unavailable.
-func TestCapabilitiesAdvertiseNoStreaming(t *testing.T) {
+// TestCapabilitiesAdvertiseSyntheticStreamingOnly asserts that the demo
+// advertises its synthetic RTSP server and preview but never VLC.
+func TestCapabilitiesAdvertiseSyntheticStreamingOnly(t *testing.T) {
 	env := newTestEnvironment(t)
 	caps := env.Capabilities()
-	if caps.RTSPServerAvailable {
-		t.Errorf("RTSPServerAvailable = true, want false")
-	}
-	if caps.PlaybackAvailable {
-		t.Errorf("PlaybackAvailable = true, want false")
+	if !caps.RTSPServerAvailable || !caps.PlaybackAvailable {
+		t.Errorf("capabilities = %+v, want synthetic RTSP and playback", caps)
 	}
 	if caps.VLCAvailable {
 		t.Errorf("VLCAvailable = true, want false")
@@ -215,6 +212,7 @@ func TestNoGoroutineLeak(t *testing.T) {
 	if _, err := env.Manager().Profiles(ctx, env.DeviceID()); err != nil {
 		t.Fatalf("Profiles() error = %v", err)
 	}
+	readLiveAccessUnits(t, env, 3)
 	if err := env.Close(ctx); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
@@ -322,5 +320,35 @@ func TestDemoScanAndInterfacesStayInsideSyntheticLoopback(t *testing.T) {
 
 	if _, err := env.Manager().Scan(context.Background(), app.DiscoveryRequest{InterfaceName: "production-interface"}); err == nil {
 		t.Fatal("demo scan accepted a production interface")
+	}
+}
+
+// TestLiveStreamRunsThroughAuthenticatedSyntheticRTSP opens the demo profile
+// through the production Manager and RTSP client and decodes access units.
+func TestLiveStreamRunsThroughAuthenticatedSyntheticRTSP(t *testing.T) {
+	env := newTestEnvironment(t)
+	readLiveAccessUnits(t, env, 10)
+}
+
+func readLiveAccessUnits(t *testing.T, env *Environment, count int) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	source, err := env.Manager().OpenLiveStream(ctx, app.StreamSelection{
+		DeviceID:     env.DeviceID(),
+		ProfileToken: "profile_main",
+		Transport:    app.StreamTransportTCP,
+	})
+	if err != nil {
+		t.Fatalf("OpenLiveStream() error = %v", err)
+	}
+	defer source.Close()
+	if len(source.SPS()) == 0 {
+		t.Fatal("the synthetic RTSP session description carries no SPS")
+	}
+	for i := 0; i < count; i++ {
+		if _, _, err := source.ReadAccessUnit(ctx); err != nil {
+			t.Fatalf("ReadAccessUnit(%d) error = %v", i, err)
+		}
 	}
 }

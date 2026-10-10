@@ -10,12 +10,13 @@
 // store.MemorySecretProvider — so nothing ever touches disk or the platform
 // keyring.
 //
-// The demo advertises no streaming features. It explicitly reports RTSP,
-// playback, and VLC as unavailable and never implements or claims RTSP,
-// despite the synthetic profile stream URIs that the media adapter surfaces.
+// Profile stream URIs point at a loopback synthetic RTSP server that requires
+// the demo credentials and serves a project-owned H.264 test pattern, so live
+// preview runs through the production RTSP client. VLC launch stays disabled.
 //
 // Dependency direction is internal/demo -> internal/fakedevice, internal/app,
-// internal/store. Nothing outside this package depends on it.
+// internal/store, internal/synthmedia. Nothing outside this package depends on
+// it.
 package demo
 
 import (

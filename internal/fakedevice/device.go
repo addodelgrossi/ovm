@@ -217,6 +217,7 @@ func (d *Device) dispatchMedia(response http.ResponseWriter, request *http.Reque
 	snapshotPath := d.config.MediaInventory.SnapshotPath
 	snapshotQuery := d.config.MediaInventory.SnapshotQuery
 	streamPath := d.config.MediaInventory.StreamPath
+	rtspPort := d.config.MediaInventory.RTSPPort
 	switch action {
 	case ActionMedia1GetProfiles:
 		d.writeMediaSuccess(response, version, mediaVer10, buildMediaProfiles(d.config, mediaVer10, requestData))
@@ -237,9 +238,9 @@ func (d *Device) dispatchMedia(response http.ResponseWriter, request *http.Reque
 	case ActionMedia2GetAudioEncoderConfigurations:
 		d.writeMediaSuccess(response, version, mediaVer20, buildAudioEncoderConfigurations(d.config, mediaVer20, requestData))
 	case ActionMedia1GetStreamURI:
-		d.writeMediaSuccess(response, version, mediaVer10, buildStreamURIResponse(mediaVer10, origin, streamPath, requestData))
+		d.writeMediaSuccess(response, version, mediaVer10, buildStreamURIResponse(mediaVer10, origin, streamPath, rtspPort, requestData))
 	case ActionMedia2GetStreamURI:
-		d.writeMediaSuccess(response, version, mediaVer20, buildStreamURIResponse(mediaVer20, origin, streamPath, requestData))
+		d.writeMediaSuccess(response, version, mediaVer20, buildStreamURIResponse(mediaVer20, origin, streamPath, rtspPort, requestData))
 	case ActionMedia1GetSnapshotURI:
 		d.writeMediaSuccess(response, version, mediaVer10, buildSnapshotURIResponse(mediaVer10, origin, snapshotPath, snapshotQuery, requestData))
 	case ActionMedia2GetSnapshotURI:

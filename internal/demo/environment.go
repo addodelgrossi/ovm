@@ -7,6 +7,7 @@ import (
 
 	"github.com/addodelgrossi/ovm/internal/app"
 	"github.com/addodelgrossi/ovm/internal/store"
+	"github.com/addodelgrossi/ovm/internal/synthmedia"
 )
 
 // DemoCameraLabel is the clearly labeled display name seeded for the single
@@ -26,15 +27,14 @@ const (
 )
 
 // Capabilities is the credential-free descriptor of what the demo environment
-// does and does not provide. The streaming-related flags are explicitly false:
-// the demo never implements or claims RTSP, playback, or VLC, even though the
-// synthetic media profiles carry stream URI values the media adapter surfaces.
+// provides. The demo serves a project-owned synthetic H.264 test pattern over a
+// loopback RTSP server; it never claims a physical camera.
 type Capabilities struct {
-	// RTSPServerAvailable is always false: no RTSP server is implemented.
+	// RTSPServerAvailable reports the loopback synthetic RTSP server.
 	RTSPServerAvailable bool `json:"rtsp_server_available"`
-	// PlaybackAvailable is always false: no playback is implemented.
+	// PlaybackAvailable reports in-app live preview of the synthetic stream.
 	PlaybackAvailable bool `json:"playback_available"`
-	// VLCAvailable is always false: no VLC integration is implemented.
+	// VLCAvailable is always false: the demo does not launch external players.
 	VLCAvailable bool `json:"vlc_available"`
 }
 
@@ -45,6 +45,7 @@ type Capabilities struct {
 type Environment struct {
 	manager  *app.Manager
 	camera   *fakeCamera
+	rtsp     *synthmedia.RTSPServer
 	deviceID string
 }
 
@@ -80,8 +81,20 @@ type Runtime struct {
 // On any failure the already-bound camera is closed so no listener or goroutine
 // leaks.
 func NewEnvironment(ctx context.Context) (*Environment, error) {
-	camera, err := newFakeCamera(demoUsername, demoPassword)
+	// The synthetic RTSP server requires the same demo credentials, so live
+	// preview exercises the production RTSP client end to end.
+	rtsp, err := synthmedia.StartRTSPServer(synthmedia.RTSPServerConfig{
+		Video:            synthmedia.H264Config{Width: 640, Height: 352, FPS: 25, GOP: 50},
+		Username:         demoUsername,
+		Password:         demoPassword,
+		SDPParameterSets: true,
+	})
 	if err != nil {
+		return nil, fmt.Errorf("start demo RTSP server: %w", err)
+	}
+	camera, err := newFakeCamera(demoUsername, demoPassword, rtsp.Port())
+	if err != nil {
+		rtsp.Close()
 		return nil, err
 	}
 
@@ -97,9 +110,11 @@ func NewEnvironment(ctx context.Context) (*Environment, error) {
 		Discovery:      demoDiscovery{endpoint: camera.urls.Device},
 		Inventory:      app.NewProductionInventory(),
 		Media:          app.NewProductionMediaProfiles(),
+		LiveStreams:    app.NewProductionLiveStreams(),
 	})
 	if err != nil {
 		_ = camera.Close()
+		rtsp.Close()
 		return nil, fmt.Errorf("compose demo manager: %w", err)
 	}
 
@@ -110,12 +125,14 @@ func NewEnvironment(ctx context.Context) (*Environment, error) {
 	if err != nil {
 		_ = manager.Close()
 		_ = camera.Close()
+		rtsp.Close()
 		return nil, err
 	}
 
 	return &Environment{
 		manager:  manager,
 		camera:   camera,
+		rtsp:     rtsp,
 		deviceID: deviceID,
 	}, nil
 }
@@ -188,12 +205,12 @@ func (e *Environment) Runtime() Runtime {
 	}
 }
 
-// Capabilities returns the credential-free capability descriptor. The streaming
-// flags are always false.
+// Capabilities returns the credential-free capability descriptor. The demo
+// serves a synthetic RTSP stream for live preview; VLC stays unavailable.
 func (e *Environment) Capabilities() Capabilities {
 	return Capabilities{
-		RTSPServerAvailable: false,
-		PlaybackAvailable:   false,
+		RTSPServerAvailable: true,
+		PlaybackAvailable:   true,
 		VLCAvailable:        false,
 	}
 }
@@ -205,5 +222,6 @@ func (e *Environment) Capabilities() Capabilities {
 func (e *Environment) Close(ctx context.Context) error {
 	managerErr := e.manager.Close()
 	cameraErr := e.camera.Shutdown(ctx)
+	e.rtsp.Close()
 	return errors.Join(managerErr, cameraErr)
 }

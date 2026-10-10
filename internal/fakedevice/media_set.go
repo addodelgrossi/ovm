@@ -199,6 +199,9 @@ func (d *Device) setMedia2Encoder(response http.ResponseWriter, version SOAPVers
 		}
 		bitrate = clampInt(bitrate, option.BitrateMin, option.BitrateMax)
 	}
+	if behavior == EncoderSetClamp && inventory.EncoderBitrateCeiling > 0 {
+		bitrate = min(bitrate, inventory.EncoderBitrateCeiling)
+	}
 	validResolution := slices.Contains(option.Resolutions, ResolutionData{request.width, request.height})
 	validRate := len(option.FrameRates) == 0 || slices.Contains(option.FrameRates, request.frameRate)
 	validGov := request.govLength == 0 || (request.govLength >= option.GovLengthMin && request.govLength <= option.GovLengthMax)

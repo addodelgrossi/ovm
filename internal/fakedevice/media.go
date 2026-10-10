@@ -79,6 +79,9 @@ type MediaInventory struct {
 	// EncoderSetBehavior selects how SetVideoEncoderConfiguration behaves:
 	// EncoderSetApply (default), EncoderSetClamp, or EncoderSetIgnore.
 	EncoderSetBehavior EncoderSetBehavior
+	// EncoderBitrateCeiling, with EncoderSetClamp, caps stored bitrates below
+	// the advertised maximum, as firmware that over-advertises does.
+	EncoderBitrateCeiling int
 
 	// SnapshotPath and StreamPath are path components, never absolute external
 	// URLs. Response builders derive the authority from the current request so

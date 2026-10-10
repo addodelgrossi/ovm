@@ -1,6 +1,6 @@
 # ovm v0.1.0 Implementation Plan
 
-Status: **M5 — Configuration in progress (implemented; awaiting native validation)**
+Status: **M5 — Configuration complete; M6 — Diagnostics next**
 Last updated: 2026-10-10
 
 ## Product goal
@@ -125,7 +125,7 @@ available and always report method and uncertainty. A result is
 | M2 Media | Complete | Media/Media2 reads, URLs, snapshots, `profiles`/`snapshot` | Passed locally and in GitHub Actions on macOS/Ubuntu |
 | M3 Desktop Base | Complete | Wails UI, persistence, Keychain, sidebar, Overview, Streams, demo | Discover and copy RTSP end to end |
 | M4 Video | Complete | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
-| M5 Configuration | In progress | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |
+| M5 Configuration | Complete | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |
 | M6 Diagnostics | Planned | SOAP console, Events, clock/stability, reports, Quick Setup, palette | Complete redacted reports |
 | M7 Distribution | Planned/blocked on hardware | macOS/Linux packages, CLI releases, two-camera gate, GitHub release | Physical acceptance and green release workflow |
 
@@ -251,7 +251,9 @@ drive authentication; it now answers token-less `GetSystemDateAndTime` as
 the ONVIF access policy requires. Hard factory reset is intentionally not
 offered. Evidence is synthetic; real network moves cannot be simulated
 because the fake keeps its listener, so moved-endpoint recovery is tested as
-`disconnected` plus the reported endpoint.
+`disconnected` plus the reported endpoint. Local and remote CI pass on macOS
+and Ubuntu, and encoder, image/IR cut, time, and reboot changes were exercised
+and confirmed in the native macOS app in demo mode.
 
 ### M6 — Diagnostics and automation
 

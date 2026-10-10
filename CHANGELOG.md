@@ -275,6 +275,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-- M0 through M4 are complete, validated locally, in remote CI, and (for M3 and
-  M4) in the native macOS app in demo mode. No physical camera has been
+- M0 through M5 are complete, validated locally, in remote CI, and (for M3,
+  M4, and M5) in the native macOS app in demo mode. No physical camera has been
   verified, and no hardware or conformance claim is made.

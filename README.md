@@ -29,9 +29,9 @@ See [the implementation plan](docs/PLAN.md) and
 M1 (ONVIF core and CLI), M2 (media and snapshots), M3 (desktop base), and M4
 (video: RTSP live preview with H.264/H.265, measured statistics, reconnection,
 JPEG fallback, a four-camera grid, clip recording, and the `probe` command) are
-complete. M5 (verified camera configuration: encoder, image and IR cut,
-time and NTP, accounts, network, and maintenance) is implemented and awaiting
-native validation. No physical camera has been verified.
+complete, as is M5 (verified camera configuration: encoder, image and IR cut,
+time and NTP, accounts, network, and maintenance). M6 (diagnostics) is next.
+No physical camera has been verified.
 
 ## Commands
 

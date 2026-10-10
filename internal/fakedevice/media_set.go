@@ -271,3 +271,19 @@ func (d *Device) setMedia1Encoder(response http.ResponseWriter, version SOAPVers
 	}
 	d.writeMediaSuccess(response, version, mediaVer10, `<trt:SetVideoEncoderConfigurationResponse/>`)
 }
+
+// ProfileEncoding reports the current Media2 encoding of a profile's video
+// encoder, reflecting any SetVideoEncoderConfiguration already applied.
+func (d *Device) ProfileEncoding(profileToken string) (string, bool) {
+	inventory := d.cfg().MediaInventory
+	index := slices.IndexFunc(inventory.Profiles, func(p MediaProfileData) bool { return p.Token == profileToken })
+	if index < 0 {
+		return "", false
+	}
+	token := inventory.Profiles[index].VideoEncoderToken
+	encoder := slices.IndexFunc(inventory.Media2VideoEncoders, func(e VideoEncoder2ConfigurationData) bool { return e.Token == token })
+	if encoder < 0 {
+		return "", false
+	}
+	return inventory.Media2VideoEncoders[encoder].Encoding, true
+}

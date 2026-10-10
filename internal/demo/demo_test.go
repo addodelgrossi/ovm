@@ -381,3 +381,24 @@ func TestSnapshotFeedServesDemoJPEGs(t *testing.T) {
 		t.Fatalf("Fetch() = %d bytes, error = %v", len(image), err)
 	}
 }
+
+// TestEncoderChangeSwitchesTheStreamedCodec changes the main profile to H.264
+// through the production encoder use case and verifies the stream follows.
+func TestEncoderChangeSwitchesTheStreamedCodec(t *testing.T) {
+	env := newTestEnvironment(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	view, err := env.Manager().ReadEncoder(ctx, env.DeviceID(), "profile_main")
+	if err != nil || view.Current.Encoding != "H265" || len(view.Codecs) != 2 {
+		t.Fatalf("ReadEncoder() = %+v, %v", view, err)
+	}
+	result, err := env.Manager().ApplyEncoder(ctx, env.DeviceID(), "profile_main", app.EncoderChange{
+		Encoding: "H264", Width: 1280, Height: 720, FrameRate: 25, BitrateKbps: 2048, GOPLength: 50, CodecProfile: "High",
+	})
+	if err != nil || result.Report.Outcome != app.OutcomeExact {
+		t.Fatalf("ApplyEncoder() = %+v, %v", result, err)
+	}
+	if codec := readLiveAccessUnits(t, env, 5); codec != stream.CodecH264 {
+		t.Fatalf("main profile codec after change = %q, want H.264", codec)
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sync/atomic"
 
 	"github.com/addodelgrossi/ovm/internal/app"
 	"github.com/addodelgrossi/ovm/internal/store"
@@ -83,11 +84,15 @@ type Runtime struct {
 // leaks.
 func NewEnvironment(ctx context.Context) (*Environment, error) {
 	// The synthetic RTSP server requires the same demo credentials, so live
-	// preview exercises the production RTSP client end to end. Like the
-	// advertised profiles, the main stream is H.265 and the others are H.264.
+	// preview exercises the production RTSP client end to end. Each request is
+	// served in the codec the fake camera currently reports for the profile,
+	// so an encoder change in the app changes the streamed codec too.
+	var cameraRef atomic.Pointer[fakeCamera]
 	rtsp, err := synthmedia.StartRTSPServer(synthmedia.RTSPServerConfig{
-		Video:            synthmedia.H264Config{Width: 640, Height: 352, FPS: 25, GOP: 50},
-		Route:            demoStreamCodec,
+		Video: synthmedia.H264Config{Width: 640, Height: 352, FPS: 25, GOP: 50},
+		Route: func(_, query string) string {
+			return demoStreamCodec(cameraRef.Load(), query)
+		},
 		Username:         demoUsername,
 		Password:         demoPassword,
 		SDPParameterSets: true,
@@ -100,6 +105,7 @@ func NewEnvironment(ctx context.Context) (*Environment, error) {
 		rtsp.Close()
 		return nil, err
 	}
+	cameraRef.Store(camera)
 
 	// In-memory persistence only: a process-local secret provider and a private
 	// in-memory repository. Neither NewDefaultRepository/NewRepository nor
@@ -116,6 +122,7 @@ func NewEnvironment(ctx context.Context) (*Environment, error) {
 		LiveStreams:    app.NewProductionLiveStreams(),
 		SnapshotFeeds:  app.NewProductionSnapshotFeed(),
 		Probe:          app.NewProductionProbe(),
+		Encoder:        app.NewProductionEncoder(),
 	})
 	if err != nil {
 		_ = camera.Close()
@@ -231,10 +238,14 @@ func (e *Environment) Close(ctx context.Context) error {
 	return errors.Join(managerErr, cameraErr)
 }
 
-// demoStreamCodec routes the main profile, which the fake camera advertises as
-// H.265, to the H.265 stream and every other profile to H.264.
-func demoStreamCodec(_, query string) string {
-	if values, err := url.ParseQuery(query); err == nil && values.Get("profile") == "profile_main" {
+// demoStreamCodec serves H.265 when the fake camera's current encoder for the
+// requested profile is H.265 and H.264 otherwise.
+func demoStreamCodec(camera *fakeCamera, query string) string {
+	values, err := url.ParseQuery(query)
+	if err != nil || camera == nil {
+		return synthmedia.CodecH264
+	}
+	if encoding, ok := camera.device.ProfileEncoding(values.Get("profile")); ok && encoding == "H265" {
 		return synthmedia.CodecH265
 	}
 	return synthmedia.CodecH264

@@ -207,8 +207,25 @@ func demoDeviceConfig(urls serviceURLs, username, password string, rtspPort int)
 		RequireUsernameToken: true,
 		Username:             username,
 		Password:             password,
-		// Stream URIs point at the demo's loopback synthetic RTSP server.
-		MediaInventory: fakedevice.MediaInventory{RTSPPort: rtspPort},
+		// Stream URIs point at the demo's loopback synthetic RTSP server, and
+		// the encoder accepts both codecs so encoder changes can be tried.
+		MediaInventory: fakedevice.MediaInventory{
+			RTSPPort: rtspPort,
+			Media2EncoderOptions: []fakedevice.Media2EncoderOptionData{
+				{
+					Encoding: "H264", Profiles: []string{"Baseline", "Main", "High"},
+					FrameRates:  []float64{30, 25, 20, 15, 10, 5},
+					Resolutions: []fakedevice.ResolutionData{{Width: 1920, Height: 1080}, {Width: 1280, Height: 720}, {Width: 640, Height: 360}},
+					QualityMin:  0, QualityMax: 10, BitrateMin: 256, BitrateMax: 8192, GovLengthMin: 1, GovLengthMax: 120,
+				},
+				{
+					Encoding: "H265", Profiles: []string{"Main"},
+					FrameRates:  []float64{30, 25, 20, 15, 10, 5},
+					Resolutions: []fakedevice.ResolutionData{{Width: 1920, Height: 1080}, {Width: 1280, Height: 720}},
+					QualityMin:  0, QualityMax: 10, BitrateMin: 256, BitrateMax: 8192, GovLengthMin: 1, GovLengthMax: 120,
+				},
+			},
+		},
 		Inventory: fakedevice.Inventory{
 			Services: []fakedevice.ServiceData{
 				{

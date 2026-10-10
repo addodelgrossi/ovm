@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"slices"
 	"strconv"
 	"time"
@@ -116,12 +117,16 @@ func NewProductionEncoder() EncoderUseCase { return &productionMedia{} }
 // reports ActionNotSupported.
 type encoderSession struct {
 	session      *session
+	seam         *authDeviceSeam
+	cameraURL    *url.URL
 	media2       media2Encoder
 	media1       media1Encoder
 	profileToken string
 	source       MediaSourceService
 	media2Config media2.VideoEncoderConfiguration
 	media1Config media1.VideoEncoderConfiguration
+	// media1Profile is the profile read by the last Media1 load.
+	media1Profile media1.Profile
 }
 
 func (p *productionMedia) openEncoder(ctx context.Context, request EncoderRequest) (*encoderSession, context.Context, context.CancelFunc, error) {
@@ -139,7 +144,7 @@ func (p *productionMedia) openEncoder(ctx context.Context, request EncoderReques
 		cancel()
 		return nil, nil, nil, err
 	}
-	encoder := &encoderSession{session: seam.session, profileToken: request.ProfileToken}
+	encoder := &encoderSession{session: seam.session, seam: seam, cameraURL: cameraURL, profileToken: request.ProfileToken}
 	if clients.media2Available {
 		encoder.media2, _ = clients.media2.(media2Encoder)
 	}
@@ -210,6 +215,7 @@ func (e *encoderSession) loadMedia1(ctx context.Context) (EncoderSettings, error
 	if index < 0 {
 		return EncoderSettings{}, usageError("the media profile was not found")
 	}
+	e.media1Profile = profiles[index]
 	if !profiles[index].Associations.HasVideoEncoderConfiguration {
 		return EncoderSettings{}, newError(CategoryProtocol, "the profile has no video encoder configuration", nil)
 	}

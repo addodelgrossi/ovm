@@ -62,6 +62,8 @@ type Manager struct {
 	probe ProbeUseCase
 	// encoder is optional; without it encoder changes report unavailable.
 	encoder EncoderUseCase
+	// imaging is optional; without it image changes report unavailable.
+	imaging ImagingUseCase
 
 	mu sync.Mutex
 	// activeScan is the single in-flight scan's tracked cancel, if any.
@@ -99,6 +101,8 @@ type ManagerDependencies struct {
 	Probe ProbeUseCase
 	// Encoder reads and changes video encoders. It is optional.
 	Encoder EncoderUseCase
+	// Imaging reads and changes image settings and IR cut. It is optional.
+	Imaging ImagingUseCase
 }
 
 // NewManager constructs a Manager from fully injected dependencies. It returns
@@ -119,6 +123,7 @@ func NewManager(deps ManagerDependencies) (*Manager, error) {
 		snapshotFeeds: deps.SnapshotFeeds,
 		probe:         deps.Probe,
 		encoder:       deps.Encoder,
+		imaging:       deps.Imaging,
 		deviceOps:     make(map[string]*trackedCancel),
 		statuses:      make(map[string]DeviceRuntimeStatus),
 	}, nil

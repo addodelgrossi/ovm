@@ -150,18 +150,50 @@ capability without embedding challenge nonces or credentials.
 not import keyring, persistence, Cobra, Wails, desktop, or application packages;
 read environment variables; prompt a user; or serialize credentials.
 
-A later scoped task will define an internal secret-provider interface and its
-macOS Keychain and Linux Secret Service adapters under `internal/store`.
-Persistent non-secret device metadata will hold only an opaque secret reference.
-The application layer will resolve that reference for the shortest practical
-period and pass the resulting credential to the protocol layer. Deleting a
-device must delete its secret through the provider.
+The M3 persistence slice implements the provider boundary under
+`internal/store`. Metadata uses deterministic JSON with `schema_version: 1` at
+`os.UserConfigDir()/ovm/state.json`. The document contains only stable device
+IDs, canonical query-free Device endpoints, optional EPR/display/discovery
+metadata, opaque credential references, the three explicit authentication
+policy flags, controlled UTC timestamps, and durable preferences. Runtime
+status, operational URI query/userinfo, demo state, usernames, and passwords
+are outside the schema. Loading is strict: malformed data, duplicate records,
+unknown fields, invalid references or enums, broken timestamp invariants, and
+unsupported or future versions are returned as typed errors and are never
+silently replaced. Migrations go through an explicit version table, including
+while v1 has no predecessor.
 
-Until that storage task exists, this ADR does not authorize a plaintext file,
-database field, command-line argument, URL, fixture, log, report, or telemetry
-substitute. Android or other platforms without an implemented provider must use
-a secure prompt or explicitly documented process input and must not silently
-persist credentials.
+Writes create the `ovm` directory with mode `0700` and use a `0600`
+same-directory temporary file. The implementation encodes, syncs, closes,
+renames atomically, and syncs the parent directory. A repository mutex
+serializes updates, deterministic device ordering is by stable ID, and every
+read API returns a copy.
+
+`SecretProvider` carries a redacted, non-serializable `Secret` containing the
+username, password, and matching authentication policy. The process-local
+memory implementation is available only for tests and explicit demo
+composition; it is never an automatic fallback. Production macOS and Linux
+adapters use `github.com/zalando/go-keyring` v0.2.8 with service
+`io.github.addodelgrossi.ovm`. Each keyring value is its own strict,
+separately-versioned JSON payload and is addressed by a cryptographically
+random opaque account reference. Provider errors expose only stable
+not-found, unavailable, denied, invalid, and unsupported categories. Android,
+iOS, Windows, and other targets without an approved adapter return the typed
+unsupported error and never persist plaintext.
+
+JSON metadata and an OS secret store cannot share one atomic commit. The
+coordinator therefore uses explicit compensation without holding the
+repository lock over provider calls: a new secret is stored before its metadata
+is published and is deleted if metadata publication fails; credential rotation
+restores prior metadata when old-secret cleanup fails and no concurrent update
+has intervened. Forget removes metadata first, treats an already-missing secret
+as idempotent success, and restores metadata plus selection when secret deletion
+is denied or unavailable. A concurrent metadata change prevents rollback and
+returns a typed conflict/rollback failure rather than overwriting newer state.
+Application code remains responsible for validating camera authentication
+before storage. `app.Manager` performs that validation and owns the coordinator
+for the desktop; the CLI continues to take credentials only from the
+environment.
 
 ### Normative sources
 
@@ -181,8 +213,8 @@ persist credentials.
   separate insecure-transport opt-in.
 - Clock offset has an honest uncertainty and cannot be presented as a
   subsecond synchronization measurement.
-- Native secret storage remains a separate implementation task with a clear
-  dependency boundary; Tasks 4–6 do not implement or simulate it.
+- Native secret storage is isolated behind a tested provider boundary;
+  unsupported targets fail explicitly without a plaintext or in-memory fallback.
 
 ## Alternatives considered
 

@@ -1,7 +1,7 @@
 # ovm v0.1.0 Implementation Plan
 
 Status: **M3 — Base Desktop Application in progress**
-Last updated: 2026-10-09
+Last updated: 2026-10-10
 
 ## Product goal
 
@@ -184,6 +184,16 @@ or ONVIF conformance claim is made.
 - Device sidebar, scanning, interface selection, manual add, search, and status.
 - Overview and Streams tabs, copy actions, and optional VLC launch.
 - Local Network privacy description and actionable diagnostics.
+
+Current work: the versioned metadata store, Keychain/Secret Service providers
+with a compensating coordinator, host-interface enumeration, `app.Manager`, the
+Wails composition and typed binding envelopes, the isolated `--demo`
+environment, and the sidebar, Overview, and Streams UI with copy actions, VLC
+launch, themes, and English/pt-BR are implemented and pass local tests. M3
+remains **In progress** until the remote CI gate passes and the exit gate is
+exercised in the native app in demo mode. Known limits: the app cannot detect
+that macOS denied Local Network permission, so diagnostics give honest generic
+guidance and point to manual add; evidence is synthetic-fixture only.
 
 ### M4 — Video
 

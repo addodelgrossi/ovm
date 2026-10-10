@@ -88,6 +88,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subprocess tests cover full Media2, Media1-only, partial fallback, auth
   policy, secret/query non-echo, cancellation, JSON stability, and output
   atomicity.
+- Versioned desktop metadata store (`internal/store`) with strict
+  `schema_version: 1` loading, atomic `0600` writes under a `0700` directory,
+  parent-directory sync, typed errors, and failure-injection tests for every
+  write stage.
+- Platform secret providers backed by the macOS Keychain and Linux Secret
+  Service through `github.com/zalando/go-keyring` v0.2.8, addressed by random
+  opaque references, plus an explicit compensating coordinator for the
+  metadata/secret boundary. Unsupported targets return a typed error and never
+  persist plaintext.
+- Host-interface enumeration in `pkg/onvif/discovery` with a closed set of
+  usability reasons, exposed through `internal/app` for interface selection.
+- `app.Manager`, the desktop device facade: scan reconciliation, manual add,
+  credential proof through inventory before storage, selection, preferences,
+  forget with secret cleanup, profile loading, and stream URI re-resolution,
+  with one active scan, one active operation per device, and memory-only
+  runtime status.
+- Wails desktop composition with typed result/error binding envelopes, an
+  isolated `--demo` mode (in-memory store and secrets, loopback fake camera),
+  and allowlisted, shell-free VLC launch from identifiers only.
+- Desktop UI: device sidebar with scan/cancel, interface selection, search,
+  status, manual add, authentication and forget dialogs; Overview and Streams
+  tabs with credential-free URLs and copy actions; system/light/dark themes;
+  English and pt-BR with enforced key parity; and Local Network diagnostics.
 
 ### Changed
 
@@ -201,6 +224,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-- M1 is complete. M2 implementation and local synthetic-fixture validation are
-  complete, but M2 remains in progress until remote CI passes. No physical
-  camera has been verified, and no hardware or conformance claim is made.
+- M0, M1, and M2 are complete. M3 implementation and local synthetic-fixture
+  validation are complete; M3 remains in progress until remote CI passes. No
+  physical camera has been verified, and no hardware or conformance claim is
+  made.

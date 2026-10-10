@@ -11,6 +11,7 @@ backend. Protocol libraries are public and UI-independent.
 - `internal/app`: application use cases and normalized presentation models.
 - `internal/store`: versioned non-secret metadata and secret-provider adapters.
 - `internal/fakedevice`: stateful Device/Media SOAP and authenticated JPEG test services.
+- `internal/demo`: isolated in-memory desktop demo environment built on the fake device.
 - `desktop`: Wails host, generated bindings, and Svelte frontend.
 
 Dependencies point inward through explicit interfaces. Neither public library
@@ -19,7 +20,7 @@ can import desktop, CLI, or persistence packages.
 ## Application boundary (`internal/app`)
 
 `internal/app` is the single normalized boundary shared by the Cobra CLI and the
-future Wails backend. It owns use-case orchestration and never leaks transport,
+Wails backend. It owns use-case orchestration and never leaks transport,
 XML, or UI types.
 
 - **Use cases** are expressed as narrow interfaces — `DiscoveryUseCase`,
@@ -107,6 +108,41 @@ XML, or UI types.
   marker. This guarantees redaction of credentials in userinfo, query, and
   fragment components; URI paths and opaque identity content are intentionally
   preserved and are not claimed to be secret-free.
+
+## M3 desktop boundaries
+
+- `app.Manager` is the device facade consumed by the Wails host. It is composed
+  from injected collaborators only (repository, host interfaces, discovery,
+  inventory, and media profiles) and creates no disk or keyring resources
+  itself. At most one scan and one network operation per device are active; a
+  newer request or a Forget cancels the prior one, and the manager never holds
+  its mutex across repository, provider, or network calls. Runtime status lives
+  only in manager memory and is never persisted.
+- `internal/store` persists versioned, strictly validated, non-secret metadata
+  (`schema_version: 1`) with atomic `0600` writes under a `0700` directory, and
+  keeps passwords behind `SecretProvider`. Production uses the macOS Keychain or
+  Linux Secret Service through go-keyring; unsupported targets fail explicitly.
+  The coordinator compensates across the metadata/secret boundary because the
+  two stores cannot commit atomically (see
+  [ADR 0003](adr/0003-authentication-and-secret-storage.md)).
+- Host interfaces are enumerated by `pkg/onvif/discovery` with a closed set of
+  usability reasons, so the UI can explain why an interface cannot be scanned
+  without exposing raw operating-system errors.
+- The desktop composition root (`desktop/composition.go`) wires production
+  adapters, or with `--demo` an isolated `internal/demo` environment: an
+  in-memory repository and secret provider plus a fake camera on IPv4 loopback.
+  Demo mode never touches the real configuration file, keyring, or multicast
+  networks, and reports RTSP playback and VLC as unavailable.
+- Wails bindings return result/error envelopes with a stable `BindingError`
+  (`category`, `code`, safe English `message`) and bound every call with the
+  host's root context. Passwords are accepted only in a request and never
+  returned or logged. `OpenInVLC` accepts identifiers only; the manager
+  re-resolves a credential-free, query-free RTSP URI and the host launches an
+  allowlisted VLC executable without a shell.
+- The Svelte frontend calls the backend only through `lib/api.ts`. Copy actions
+  use the native Wails clipboard first and the web clipboard as a fallback.
+  Locale (English, pt-BR) and theme (system, light, dark) are persisted
+  preferences, and pt-BR key parity is enforced by types and tests.
 
 ## M2 Media and snapshot boundaries
 

@@ -1673,3 +1673,25 @@ tbody th {
   color: var(--success);
   font-weight: 600;
 }
+
+.live-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.live-stats div {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.live-stats dt {
+  color: var(--muted);
+}
+
+.live-stats dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}

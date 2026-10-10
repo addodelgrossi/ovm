@@ -94,6 +94,23 @@ func TestPreviewControllerStreamsDemoSourceAndStops(t *testing.T) {
 	if string(header[4:8]) != "ftyp" {
 		t.Fatalf("stream does not start with an init segment: % x", header)
 	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		stats, ok := controller.stats(result.SessionID)
+		if !ok {
+			t.Fatal("stats() did not find the active preview")
+		}
+		if stats.Frames >= 10 && stats.FramesPerSecond > 0 {
+			if stats.Width != 64 || stats.Height != 48 || stats.TimeToFirstFrame <= 0 {
+				t.Fatalf("unexpected stats %+v", stats)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("stats did not advance: %+v", stats)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 
 	if !controller.stop(result.SessionID) {
 		t.Fatal("stop() did not find the active preview")

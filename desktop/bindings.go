@@ -150,6 +150,32 @@ type StopPreviewRequest struct {
 	SessionID string `json:"session_id"`
 }
 
+type PreviewStatsRequest struct {
+	SessionID string `json:"session_id"`
+}
+
+// PreviewStats are live measurements of a preview session. Durations are in
+// milliseconds for the frontend.
+type PreviewStats struct {
+	Width                  int     `json:"width"`
+	Height                 int     `json:"height"`
+	FramesPerSecond        float64 `json:"frames_per_second"`
+	BitrateKbps            float64 `json:"bitrate_kbps"`
+	GOPFrames              int     `json:"gop_frames"`
+	GOPSeconds             float64 `json:"gop_seconds"`
+	TimeToFirstFrameMillis int64   `json:"time_to_first_frame_ms"`
+	Frames                 uint64  `json:"frames"`
+	Keyframes              uint64  `json:"keyframes"`
+	LostPackets            uint64  `json:"lost_packets"`
+	ElapsedMillis          int64   `json:"elapsed_ms"`
+	FirstFrameReceived     bool    `json:"first_frame_received"`
+}
+
+type PreviewStatsResponse struct {
+	Result *PreviewStats `json:"result,omitempty"`
+	Error  *BindingError `json:"error,omitempty"`
+}
+
 // Bootstrap loads the persisted catalog and returns immutable desktop
 // capabilities. Constructing and calling it does not access secure storage.
 func (a *App) Bootstrap() BootstrapResponse {
@@ -433,6 +459,37 @@ func (a *App) StopPreview(request StopPreviewRequest) ActionResponse {
 	}
 	previews.stop(request.SessionID)
 	return ActionResponse{Result: &ActionResult{Completed: true}}
+}
+
+// PreviewStats returns live measurements for an active preview.
+func (a *App) PreviewStats(request PreviewStatsRequest) PreviewStatsResponse {
+	if !validPreviewSessionID(request.SessionID) {
+		return PreviewStatsResponse{Error: bindingValidation("invalid_session_id", "the preview session identifier is not valid")}
+	}
+	a.mu.Lock()
+	previews := a.previews
+	a.mu.Unlock()
+	if previews == nil {
+		return PreviewStatsResponse{Error: bindingUnavailable("app_closed", "the desktop application is closed")}
+	}
+	stats, ok := previews.stats(request.SessionID)
+	if !ok {
+		return PreviewStatsResponse{Error: bindingValidation("preview_not_found", "the preview session is not active")}
+	}
+	return PreviewStatsResponse{Result: &PreviewStats{
+		Width:                  stats.Width,
+		Height:                 stats.Height,
+		FramesPerSecond:        stats.FramesPerSecond,
+		BitrateKbps:            stats.BitrateKbps,
+		GOPFrames:              stats.GOPFrames,
+		GOPSeconds:             stats.GOPSeconds,
+		TimeToFirstFrameMillis: stats.TimeToFirstFrame.Milliseconds(),
+		Frames:                 stats.Frames,
+		Keyframes:              stats.Keyframes,
+		LostPackets:            stats.LostPackets,
+		ElapsedMillis:          stats.Elapsed.Milliseconds(),
+		FirstFrameReceived:     stats.Keyframes > 0,
+	}}
 }
 
 func bindingErrorFrom(err error) *BindingError {

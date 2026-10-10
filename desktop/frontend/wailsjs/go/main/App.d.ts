@@ -35,6 +35,10 @@ export function OpenInVLC(
   arg1: main.OpenInVLCRequest
 ): Promise<main.ActionResponse>
 
+export function PreviewStats(
+  arg1: main.PreviewStatsRequest
+): Promise<main.PreviewStatsResponse>
+
 export function Scan(arg1: main.ScanRequest): Promise<main.ScanResponse>
 
 export function SelectDevice(

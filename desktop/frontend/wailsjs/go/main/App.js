@@ -42,6 +42,10 @@ export function OpenInVLC(arg1) {
   return window['go']['main']['App']['OpenInVLC'](arg1)
 }
 
+export function PreviewStats(arg1) {
+  return window['go']['main']['App']['PreviewStats'](arg1)
+}
+
 export function Scan(arg1) {
   return window['go']['main']['App']['Scan'](arg1)
 }

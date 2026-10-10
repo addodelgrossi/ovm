@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
-  import { api, type Locale } from '../lib/api'
+  import { api, type Locale, type PreviewStats } from '../lib/api'
   import { errorMessage, t } from '../lib/i18n'
   import { LivePlayer, type LivePlayerState } from '../lib/livePlayer'
 
@@ -19,8 +19,25 @@
   let video = $state<HTMLVideoElement>()
   let active = $state(false)
   let playerState = $state<LivePlayerState | undefined>()
+  let stats = $state<PreviewStats | undefined>()
   let player: LivePlayer | undefined
   let sessionId = ''
+  let statsTimer: ReturnType<typeof setInterval> | undefined
+
+  const statsIntervalMs = 1000
+
+  async function refreshStats(): Promise<void> {
+    if (!sessionId) return
+    const response = await api.previewStats(sessionId)
+    if (response.data && active) stats = response.data
+  }
+
+  function number(value: number, digits = 1): string {
+    return new Intl.NumberFormat(locale, {
+      maximumFractionDigits: digits,
+      minimumFractionDigits: digits
+    }).format(value)
+  }
 
   async function start(): Promise<void> {
     active = true
@@ -40,6 +57,7 @@
       return
     }
     sessionId = response.data.session_id
+    statsTimer = setInterval(() => void refreshStats(), statsIntervalMs)
     player = new LivePlayer(video, response.data, (next) => {
       playerState = next
     })
@@ -48,6 +66,9 @@
 
   function stop(): void {
     active = false
+    if (statsTimer) clearInterval(statsTimer)
+    statsTimer = undefined
+    stats = undefined
     player?.stop()
     player = undefined
     if (sessionId) void api.stopPreview(sessionId)
@@ -98,6 +119,41 @@
         class="button button-secondary"
         onclick={() => void start()}>{t(locale, 'live.start')}</button
       >
+    {/if}
+    {#if stats?.first_frame_received}
+      <dl class="live-stats" aria-label={t(locale, 'live.statsLabel')}>
+        <div>
+          <dt>{t(locale, 'live.statResolution')}</dt>
+          <dd>{stats.width} × {stats.height}</dd>
+        </div>
+        <div>
+          <dt>{t(locale, 'live.statFps')}</dt>
+          <dd>{number(stats.frames_per_second)} fps</dd>
+        </div>
+        <div>
+          <dt>{t(locale, 'live.statBitrate')}</dt>
+          <dd>{number(stats.bitrate_kbps, 0)} kbps</dd>
+        </div>
+        <div>
+          <dt>{t(locale, 'live.statGop')}</dt>
+          <dd>
+            {stats.gop_frames > 0
+              ? t(locale, 'live.gopValue', {
+                  frames: String(stats.gop_frames),
+                  seconds: number(stats.gop_seconds, 2)
+                })
+              : '—'}
+          </dd>
+        </div>
+        <div>
+          <dt>{t(locale, 'live.statFirstFrame')}</dt>
+          <dd>{stats.time_to_first_frame_ms} ms</dd>
+        </div>
+        <div>
+          <dt>{t(locale, 'live.statLost')}</dt>
+          <dd>{stats.lost_packets}</dd>
+        </div>
+      </dl>
     {/if}
     {#if playerState}
       <span

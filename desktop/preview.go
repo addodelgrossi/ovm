@@ -35,6 +35,7 @@ type previewController struct {
 
 type activePreview struct {
 	cancel context.CancelFunc
+	meter  *stream.Meter
 }
 
 func newPreviewController(factory PreviewSourceFactory, origins []string) *previewController {
@@ -66,6 +67,8 @@ func (c *previewController) start(callCtx, root context.Context, manager Manager
 	server := c.server
 	c.mu.Unlock()
 
+	// Time to first frame includes connecting to the camera.
+	meter := stream.NewMeter(nil)
 	source, release, err := c.factory(callCtx, manager, selection)
 	if err != nil {
 		return nil, err
@@ -78,6 +81,7 @@ func (c *previewController) start(callCtx, root context.Context, manager Manager
 		return nil, err
 	}
 
+	metered := stream.NewMeteredSource(source, meter)
 	ctx, cancel := context.WithCancel(root)
 	c.mu.Lock()
 	if c.closed || len(c.active) >= maxConcurrentPreviews {
@@ -92,13 +96,13 @@ func (c *previewController) start(callCtx, root context.Context, manager Manager
 		}
 		return nil, errPreviewLimit
 	}
-	c.active[session.ID()] = &activePreview{cancel: cancel}
+	c.active[session.ID()] = &activePreview{cancel: cancel, meter: meter}
 	c.wg.Add(1)
 	c.mu.Unlock()
 
 	go func() {
 		defer c.wg.Done()
-		_ = stream.PumpH264FMP4(ctx, source, session)
+		_ = stream.PumpH264FMP4(ctx, metered, session)
 		session.Close()
 		if release != nil {
 			release()
@@ -113,6 +117,17 @@ func (c *previewController) start(callCtx, root context.Context, manager Manager
 		URL:       server.BaseURL() + session.Path(),
 		Token:     server.Token(),
 	}, nil
+}
+
+// stats returns the measurements of an active preview.
+func (c *previewController) stats(sessionID string) (stream.Stats, bool) {
+	c.mu.Lock()
+	active := c.active[sessionID]
+	c.mu.Unlock()
+	if active == nil {
+		return stream.Stats{}, false
+	}
+	return active.meter.Snapshot(), true
 }
 
 func (c *previewController) stop(sessionID string) bool {

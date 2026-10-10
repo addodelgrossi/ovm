@@ -35,7 +35,8 @@ const apiMock = vi.hoisted(() => ({
   openInVLC: vi.fn(),
   copyText: vi.fn(),
   startPreview: vi.fn(),
-  stopPreview: vi.fn()
+  stopPreview: vi.fn(),
+  previewStats: vi.fn()
 }))
 
 vi.mock('./lib/api', () => ({ api: apiMock }))
@@ -871,6 +872,22 @@ describe('App M3 integration', () => {
       }
     })
     apiMock.stopPreview.mockResolvedValue({ data: { completed: true } })
+    apiMock.previewStats.mockResolvedValue({
+      data: {
+        width: 640,
+        height: 352,
+        frames_per_second: 25,
+        bitrate_kbps: 1834.4,
+        gop_frames: 50,
+        gop_seconds: 2,
+        time_to_first_frame_ms: 118,
+        frames: 120,
+        keyframes: 3,
+        lost_packets: 0,
+        elapsed_ms: 4800,
+        first_frame_received: true
+      }
+    })
     await renderReady()
     await fireEvent.click(screen.getByRole('tab', { name: /Streams/ }))
     await screen.findByRole('heading', { name: 'Profile Main stream' })
@@ -888,6 +905,20 @@ describe('App M3 integration', () => {
         'This WebView does not support Media Source Extensions, so live video cannot play here.'
       )
     ).toBeTruthy()
+
+    const stats = await screen.findByLabelText(
+      'Measured stream statistics',
+      {},
+      { timeout: 3000 }
+    )
+    expect(stats.textContent).toContain('640 × 352')
+    expect(stats.textContent).toContain('25.0 fps')
+    expect(stats.textContent).toContain('1,834 kbps')
+    expect(stats.textContent).toContain('50 frames (2.00 s)')
+    expect(stats.textContent).toContain('118 ms')
+    expect(apiMock.previewStats).toHaveBeenCalledWith(
+      '0123456789abcdef0123456789abcdef'
+    )
 
     await fireEvent.click(screen.getByRole('button', { name: 'Stop preview' }))
     expect(apiMock.stopPreview).toHaveBeenCalledWith(

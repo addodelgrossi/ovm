@@ -9,6 +9,7 @@ import {
   LoadOverview,
   LoadProfiles,
   OpenInVLC,
+  PreviewStats as ReadPreviewStats,
   Scan,
   SelectDevice,
   StartPreview,
@@ -66,6 +67,21 @@ export interface CapabilityFlags {
   rtsp_playback_available: boolean
   vlc_available: boolean
   live_preview_available: boolean
+}
+
+export interface PreviewStats {
+  width: number
+  height: number
+  frames_per_second: number
+  bitrate_kbps: number
+  gop_frames: number
+  gop_seconds: number
+  time_to_first_frame_ms: number
+  frames: number
+  keyframes: number
+  lost_packets: number
+  elapsed_ms: number
+  first_frame_received: boolean
 }
 
 export interface PreviewSession {
@@ -301,6 +317,7 @@ export interface OvmApi {
     profileToken: string
   ): Promise<ApiResponse<PreviewSession>>
   stopPreview(sessionId: string): Promise<ApiResponse<{ completed: boolean }>>
+  previewStats(sessionId: string): Promise<ApiResponse<PreviewStats>>
 }
 
 interface BindingEnvelope<T> {
@@ -385,6 +402,8 @@ export const api: OvmApi = {
     invoke<{ completed: boolean }>(() =>
       StopPreview({ session_id: sessionId })
     ),
+  previewStats: (sessionId) =>
+    invoke<PreviewStats>(() => ReadPreviewStats({ session_id: sessionId })),
   async copyText(text) {
     // The native clipboard works even when the WebView blocks navigator.clipboard.
     try {

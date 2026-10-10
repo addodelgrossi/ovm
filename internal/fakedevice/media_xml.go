@@ -429,6 +429,30 @@ func buildVideoEncoder2Configurations(config normalizedConfig, request mediaRequ
 }
 
 func buildVideoEncoderOptions(config normalizedConfig, media mediaVersion) string {
+	if media == mediaVer20 && len(config.MediaInventory.Media2EncoderOptions) > 0 {
+		var body string
+		for _, option := range config.MediaInventory.Media2EncoderOptions {
+			attributes := ` GovLengthRange="` + itoa(option.GovLengthMin) + ` ` + itoa(option.GovLengthMax) + `"`
+			if len(option.FrameRates) > 0 {
+				rates := make([]string, 0, len(option.FrameRates))
+				for _, rate := range option.FrameRates {
+					rates = append(rates, ftoa(rate))
+				}
+				attributes += ` FrameRatesSupported="` + strings.Join(rates, " ") + `"`
+			}
+			if len(option.Profiles) > 0 {
+				attributes += ` ProfilesSupported="` + escapeXML(strings.Join(option.Profiles, " ")) + `"`
+			}
+			resolutions := ""
+			for _, resolution := range option.Resolutions {
+				resolutions += resolutionXML(resolution.Width, resolution.Height)
+			}
+			body += `<tr2:Options` + attributes + `><tt:Encoding>` + escapeXML(option.Encoding) + `</tt:Encoding>` +
+				floatRangeXML("QualityRange", option.QualityMin, option.QualityMax) + resolutions +
+				intRangeXML("BitrateRange", option.BitrateMin, option.BitrateMax) + `</tr2:Options>`
+		}
+		return `<tr2:GetVideoEncoderConfigurationOptionsResponse>` + body + `</tr2:GetVideoEncoderConfigurationOptionsResponse>`
+	}
 	if media == mediaVer20 {
 		options := config.MediaInventory.Media2VideoEncoderOptions
 		return `<tr2:GetVideoEncoderConfigurationOptionsResponse>` +

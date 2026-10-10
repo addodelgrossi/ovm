@@ -207,8 +207,29 @@ func (d *Device) dispatch(response http.ResponseWriter, request *http.Request, v
 		d.SetState(stateRequest.Key, stateRequest.Value)
 		d.writeSuccess(response, version, buildSetState(*d.cfg()))
 	default:
+		if handler, ok := mutationHandlers[action]; ok {
+			handler(d, response, version, operation)
+			return
+		}
 		d.dispatchMedia(response, request, version, action, requestData)
 	}
+}
+
+// mutationHandler applies a modeled Set* operation and writes its response.
+type mutationHandler func(d *Device, response http.ResponseWriter, version SOAPVersion, operation operationWire)
+
+// mutationHandlers maps mutating actions to handlers; each file that models
+// mutations registers its own in init.
+var mutationHandlers = map[string]mutationHandler{}
+
+// mutate publishes a modified copy of the configuration. Mutations are
+// serialized so concurrent Set* requests never lose an update.
+func (d *Device) mutate(change func(next *normalizedConfig)) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	next := *d.cfg()
+	change(&next)
+	d.current.Store(&next)
 }
 
 // dispatchMedia produces a synthetic response for a validated, authorized Media

@@ -72,6 +72,13 @@ type MediaInventory struct {
 	Media2VideoEncoders       []VideoEncoder2ConfigurationData
 	Media2VideoEncoderOptions VideoEncoder2OptionsData
 	Media2AudioEncoders       []AudioEncoder2ConfigurationData
+	// Media2EncoderOptions, when non-empty, replaces Media2VideoEncoderOptions
+	// with one Options entry per codec, including the optional frame-rate,
+	// profile, and resolution lists.
+	Media2EncoderOptions []Media2EncoderOptionData
+	// EncoderSetBehavior selects how SetVideoEncoderConfiguration behaves:
+	// EncoderSetApply (default), EncoderSetClamp, or EncoderSetIgnore.
+	EncoderSetBehavior EncoderSetBehavior
 
 	// SnapshotPath and StreamPath are path components, never absolute external
 	// URLs. Response builders derive the authority from the current request so

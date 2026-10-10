@@ -7,27 +7,21 @@ import (
 	"github.com/addodelgrossi/ovm/pkg/stream"
 )
 
-// LiveH264Source is a running live stream that the caller must Close.
-type LiveH264Source interface {
-	stream.H264Source
-	Close()
-}
-
-// LiveStreamOpener opens a live H.264 stream. Production composition uses
+// LiveStreamOpener opens a live H.264 or H.265 stream. Production composition uses
 // NewProductionLiveStreams; tests and the demo inject their own.
-type LiveStreamOpener func(ctx context.Context, options stream.RTSPOptions) (LiveH264Source, error)
+type LiveStreamOpener func(ctx context.Context, options stream.RTSPOptions) (stream.LiveSource, error)
 
 // NewProductionLiveStreams opens RTSP sessions with the pkg/stream client.
 func NewProductionLiveStreams() LiveStreamOpener {
-	return func(ctx context.Context, options stream.RTSPOptions) (LiveH264Source, error) {
-		return stream.OpenRTSPH264(ctx, options)
+	return func(ctx context.Context, options stream.RTSPOptions) (stream.LiveSource, error) {
+		return stream.OpenRTSP(ctx, options)
 	}
 }
 
 // OpenLiveStream resolves the selected profile's stream through the
 // authenticated backend and opens it with the stored credentials. The URI and
 // credentials stay inside the backend; only the decoded media leaves.
-func (m *Manager) OpenLiveStream(ctx context.Context, selection StreamSelection) (LiveH264Source, error) {
+func (m *Manager) OpenLiveStream(ctx context.Context, selection StreamSelection) (stream.LiveSource, error) {
 	if m.liveStreams == nil {
 		return nil, newManagerError(CategoryInternal, "live streaming is not configured", nil)
 	}
@@ -71,7 +65,7 @@ func liveStreamError(err error) *ManagerError {
 	case errors.Is(err, stream.ErrRTSPNetwork):
 		return newManagerError(CategoryNetwork, "the camera stream could not be reached", err)
 	case errors.Is(err, stream.ErrRTSPUnsupportedCodec):
-		return newManagerError(CategoryProtocol, "the stream has no supported H.264 video track", err)
+		return newManagerError(CategoryProtocol, "the stream has no supported H.264 or H.265 video track", err)
 	case errors.Is(err, stream.ErrRTSPNotFound):
 		return newManagerError(CategoryProtocol, "the camera does not serve the selected stream", err)
 	default:

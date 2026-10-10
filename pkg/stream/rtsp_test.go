@@ -33,23 +33,23 @@ func TestRTSPSourceAuthenticatesAndFeedsTheMuxer(t *testing.T) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	source, err := OpenRTSPH264(ctx, RTSPOptions{
+	source, err := OpenRTSP(ctx, RTSPOptions{
 		URL:      server.URL("/cam/realmonitor?channel=1&subtype=0"),
 		Username: "viewer",
 		Password: "synthetic-secret",
 	})
 	if err != nil {
-		t.Fatalf("OpenRTSPH264() error = %v", err)
+		t.Fatalf("OpenRTSP() error = %v", err)
 	}
 	defer source.Close()
-	if len(source.SPS()) == 0 || len(source.PPS()) == 0 {
+	if source.Codec() != CodecH264 || len(source.ParameterSets()) != 2 {
 		t.Fatal("parameter sets from the session description are missing")
 	}
 
 	sink := &recordingSink{}
 	pumpCtx, stopPump := context.WithCancel(ctx)
 	done := make(chan error, 1)
-	go func() { done <- PumpH264FMP4(pumpCtx, source, sink) }()
+	go func() { done <- PumpFMP4(pumpCtx, source, sink) }()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		sink.mu.Lock()
@@ -65,7 +65,7 @@ func TestRTSPSourceAuthenticatesAndFeedsTheMuxer(t *testing.T) {
 	}
 	stopPump()
 	if err := <-done; !errors.Is(err, context.Canceled) {
-		t.Fatalf("PumpH264FMP4() error = %v", err)
+		t.Fatalf("PumpFMP4() error = %v", err)
 	}
 	if len(sink.codecs) != 1 || sink.codecs[0] != "avc1.42c01f" {
 		t.Fatalf("codecs = %v", sink.codecs)
@@ -77,15 +77,15 @@ func TestRTSPSourceStartsFromInBandParameterSets(t *testing.T) {
 	server := startRTSPServer(t, synthmedia.RTSPServerConfig{})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	source, err := OpenRTSPH264(ctx, RTSPOptions{URL: server.URL("/stream")})
+	source, err := OpenRTSP(ctx, RTSPOptions{URL: server.URL("/stream")})
 	if err != nil {
-		t.Fatalf("OpenRTSPH264() error = %v", err)
+		t.Fatalf("OpenRTSP() error = %v", err)
 	}
 	defer source.Close()
 	sink := &recordingSink{}
 	pumpCtx, stopPump := context.WithTimeout(ctx, 2*time.Second)
 	defer stopPump()
-	_ = PumpH264FMP4(pumpCtx, source, sink)
+	_ = PumpFMP4(pumpCtx, source, sink)
 	if len(sink.codecs) != 1 || sink.fragments == 0 {
 		t.Fatalf("pump did not start from in-band parameter sets: codecs=%v fragments=%d", sink.codecs, sink.fragments)
 	}
@@ -96,9 +96,9 @@ func TestRTSPSourceRejectsWrongCredentialsWithoutLeakingThem(t *testing.T) {
 	server := startRTSPServer(t, synthmedia.RTSPServerConfig{Username: "viewer", Password: "synthetic-secret"})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_, err := OpenRTSPH264(ctx, RTSPOptions{URL: server.URL("/stream"), Username: "viewer", Password: "wrong-marker"})
+	_, err := OpenRTSP(ctx, RTSPOptions{URL: server.URL("/stream"), Username: "viewer", Password: "wrong-marker"})
 	if !errors.Is(err, ErrRTSPAuthentication) {
-		t.Fatalf("OpenRTSPH264() error = %v, want ErrRTSPAuthentication", err)
+		t.Fatalf("OpenRTSP() error = %v, want ErrRTSPAuthentication", err)
 	}
 	if strings.Contains(err.Error(), "wrong-marker") || strings.Contains(err.Error(), "127.0.0.1") {
 		t.Fatalf("error leaked a secret or URL: %v", err)
@@ -108,8 +108,8 @@ func TestRTSPSourceRejectsWrongCredentialsWithoutLeakingThem(t *testing.T) {
 func TestRTSPSourceRejectsUnsafeURLs(t *testing.T) {
 	t.Parallel()
 	for _, raw := range []string{"", "http://camera/stream", "rtsp://user:pass@camera/stream", "rtsp://camera/stream#x", "rtsp:///stream", "rtsp://camera/\nstream"} {
-		if _, err := OpenRTSPH264(context.Background(), RTSPOptions{URL: raw}); !errors.Is(err, ErrRTSPInvalidURL) {
-			t.Errorf("OpenRTSPH264(%q) error = %v, want ErrRTSPInvalidURL", raw, err)
+		if _, err := OpenRTSP(context.Background(), RTSPOptions{URL: raw}); !errors.Is(err, ErrRTSPInvalidURL) {
+			t.Errorf("OpenRTSP(%q) error = %v, want ErrRTSPInvalidURL", raw, err)
 		}
 	}
 }
@@ -134,9 +134,9 @@ func TestRTSPSourceSetupIsCancellable(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 	started := time.Now()
-	_, err = OpenRTSPH264(ctx, RTSPOptions{URL: "rtsp://" + listener.Addr().String() + "/stream", Timeout: 30 * time.Second})
+	_, err = OpenRTSP(ctx, RTSPOptions{URL: "rtsp://" + listener.Addr().String() + "/stream", Timeout: 30 * time.Second})
 	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("OpenRTSPH264() error = %v, want context.DeadlineExceeded", err)
+		t.Fatalf("OpenRTSP() error = %v, want context.DeadlineExceeded", err)
 	}
 	if elapsed := time.Since(started); elapsed > 5*time.Second {
 		t.Fatalf("cancellation took %v", elapsed)

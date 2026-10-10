@@ -27,7 +27,7 @@ func TestMeterMeasuresRateGOPAndTimeToFirstFrame(t *testing.T) {
 	var expectedBytes uint64
 	for index := 5; index < 105; index++ {
 		au, _ := source.NextAccessUnit()
-		meter.Observe(au, time.Duration(index)*40*time.Millisecond)
+		meter.Observe(CodecH264, au, time.Duration(index)*40*time.Millisecond)
 		if index >= 25 {
 			for _, nalu := range au {
 				expectedBytes += uint64(len(nalu))
@@ -65,7 +65,7 @@ func TestMeterBitrateCountsPayloadOverTheWindow(t *testing.T) {
 		if i == 0 {
 			unit = [][]byte{append(key[0], make([]byte, 996)...)}
 		}
-		meter.Observe(unit, time.Duration(i)*100*time.Millisecond)
+		meter.Observe(CodecH264, unit, time.Duration(i)*100*time.Millisecond)
 	}
 	stats := meter.Snapshot()
 	if math.Abs(stats.BitrateKbps-80) > 1e-6 || math.Abs(stats.FramesPerSecond-10) > 1e-6 {
@@ -74,7 +74,7 @@ func TestMeterBitrateCountsPayloadOverTheWindow(t *testing.T) {
 }
 
 type lossySource struct {
-	H264Source
+	VideoSource
 	lost uint64
 }
 
@@ -83,14 +83,14 @@ func (l *lossySource) LostPackets() uint64 { return l.lost }
 func TestMeteredSourceObservesReadsAndReportsLoss(t *testing.T) {
 	t.Parallel()
 	inner := newSyntheticSource(t, synthmedia.H264Config{Width: 64, Height: 48, FPS: 10, GOP: 5})
-	scripted := &scriptedSource{sps: inner.SPS(), pps: inner.PPS()}
+	scripted := &scriptedSource{codec: CodecH264, sets: inner.ParameterSets()}
 	for i := 0; i < 3; i++ {
 		au, _ := inner.NextAccessUnit()
 		scripted.units = append(scripted.units, au)
 		scripted.pts = append(scripted.pts, time.Duration(i)*100*time.Millisecond)
 	}
 	meter := NewMeter(nil)
-	source := NewMeteredSource(&lossySource{H264Source: scripted, lost: 7}, meter)
+	source := NewMeteredSource(&lossySource{VideoSource: scripted, lost: 7}, meter)
 	for i := 0; i < 3; i++ {
 		if _, _, err := source.ReadAccessUnit(context.Background()); err != nil {
 			t.Fatalf("ReadAccessUnit() error = %v", err)

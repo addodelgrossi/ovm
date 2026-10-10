@@ -8,6 +8,7 @@ import (
 
 	core "github.com/addodelgrossi/ovm/internal/app"
 	"github.com/addodelgrossi/ovm/internal/buildinfo"
+	"github.com/addodelgrossi/ovm/pkg/stream"
 )
 
 const (
@@ -28,7 +29,7 @@ type Manager interface {
 	Overview(context.Context) (core.Overview, error)
 	Profiles(context.Context, string) (core.MediaProfilesResult, error)
 	ResolveStreamURI(context.Context, core.StreamSelection) (string, error)
-	OpenLiveStream(context.Context, core.StreamSelection) (core.LiveH264Source, error)
+	OpenLiveStream(context.Context, core.StreamSelection) (stream.LiveSource, error)
 	UpdatePreferences(context.Context, core.PreferencesRequest) (core.Overview, error)
 	Close() error
 }

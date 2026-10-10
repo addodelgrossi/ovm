@@ -5,15 +5,7 @@ import (
 	"errors"
 	"sync"
 	"time"
-
-	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
 )
-
-// LiveSource is an H264Source that owns a connection.
-type LiveSource interface {
-	H264Source
-	Close()
-}
 
 // SourceOpener opens a fresh live source. It is called again after failures.
 type SourceOpener func(ctx context.Context) (LiveSource, error)
@@ -44,7 +36,8 @@ type ReconnectingSource struct {
 
 	mu          sync.Mutex
 	current     LiveSource
-	sps, pps    []byte
+	codec       string
+	sets        [][]byte
 	reconnects  uint64
 	lostClosed  uint64
 	needKey     bool
@@ -76,16 +69,16 @@ func OpenReconnecting(ctx context.Context, opener SourceOpener, options Reconnec
 		opener:  opener,
 		options: options,
 		current: first,
-		sps:     first.SPS(),
-		pps:     first.PPS(),
+		codec:   first.Codec(),
+		sets:    first.ParameterSets(),
 	}, nil
 }
 
-// SPS returns the first session's sequence parameter set.
-func (s *ReconnectingSource) SPS() []byte { return s.sps }
+// Codec returns the first session's codec.
+func (s *ReconnectingSource) Codec() string { return s.codec }
 
-// PPS returns the first session's picture parameter set.
-func (s *ReconnectingSource) PPS() []byte { return s.pps }
+// ParameterSets returns the first session's out-of-band parameter sets.
+func (s *ReconnectingSource) ParameterSets() [][]byte { return s.sets }
 
 // Reconnects reports how many times the stream was re-established.
 func (s *ReconnectingSource) Reconnects() uint64 {
@@ -199,7 +192,7 @@ func (s *ReconnectingSource) mapTimestamp(au [][]byte, pts time.Duration) (time.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.needKey {
-		if !h264.IsRandomAccess(au) {
+		if !isRandomAccess(s.codec, au) {
 			return 0, false
 		}
 		s.needKey = false

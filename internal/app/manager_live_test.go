@@ -12,8 +12,8 @@ import (
 
 type fakeLiveSource struct{ closed bool }
 
-func (f *fakeLiveSource) SPS() []byte { return nil }
-func (f *fakeLiveSource) PPS() []byte { return nil }
+func (f *fakeLiveSource) Codec() string           { return stream.CodecH264 }
+func (f *fakeLiveSource) ParameterSets() [][]byte { return nil }
 func (f *fakeLiveSource) ReadAccessUnit(ctx context.Context) ([][]byte, time.Duration, error) {
 	<-ctx.Done()
 	return nil, 0, ctx.Err()
@@ -29,7 +29,7 @@ func TestOpenLiveStreamUsesResolvedURIAndStoredCredentials(t *testing.T) {
 			"rtsp://192.168.44.20/cam/realmonitor?channel=1&subtype=0&udp=1"),
 	}}
 	var received []stream.RTSPOptions
-	h.manager.liveStreams = func(_ context.Context, options stream.RTSPOptions) (LiveH264Source, error) {
+	h.manager.liveStreams = func(_ context.Context, options stream.RTSPOptions) (stream.LiveSource, error) {
 		received = append(received, options)
 		return &fakeLiveSource{}, nil
 	}
@@ -76,7 +76,7 @@ func TestOpenLiveStreamMapsFailuresToSafeErrors(t *testing.T) {
 		context.Canceled:               CategoryCancelled,
 	}
 	for cause, want := range cases {
-		h.manager.liveStreams = func(context.Context, stream.RTSPOptions) (LiveH264Source, error) {
+		h.manager.liveStreams = func(context.Context, stream.RTSPOptions) (stream.LiveSource, error) {
 			return nil, cause
 		}
 		_, err := h.manager.OpenLiveStream(context.Background(), selection)

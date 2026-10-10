@@ -4,22 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"time"
-
-	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
 )
-
-// H264Source yields H.264 access units with presentation timestamps.
-type H264Source interface {
-	// SPS and PPS describe the stream before the first access unit, for
-	// example from an RTSP session description. They may be empty when the
-	// stream carries parameter sets only in-band.
-	SPS() []byte
-	PPS() []byte
-	// ReadAccessUnit blocks for the next access unit (NAL units without start
-	// codes) and its presentation timestamp.
-	ReadAccessUnit(ctx context.Context) ([][]byte, time.Duration, error)
-}
 
 // FragmentSink receives a fragmented MP4 stream.
 type FragmentSink interface {
@@ -30,25 +15,17 @@ type FragmentSink interface {
 	WriteFragment(fragment []byte, key bool)
 }
 
-// PumpH264FMP4 remuxes source into sink until ctx ends or the source fails.
-// A change of in-band parameter sets restarts the muxer and republishes the
-// initialization segment. It returns ctx.Err() after cancellation.
-func PumpH264FMP4(ctx context.Context, source H264Source, sink FragmentSink) error {
-	sps, pps := source.SPS(), source.PPS()
-	var muxer *H264FMP4Muxer
-	start := func() error {
-		next, err := NewH264FMP4Muxer(sps, pps)
-		if err != nil {
-			return err
-		}
-		init, err := next.Init()
-		if err != nil {
-			return err
-		}
-		muxer = next
-		sink.SetInit(next.CodecString(), init)
-		return nil
+// PumpFMP4 remuxes source into sink until ctx ends or the source fails. A
+// change of in-band parameter sets restarts the muxer and republishes the
+// initialization segment, as does a timestamp discontinuity. It returns
+// ctx.Err() after cancellation.
+func PumpFMP4(ctx context.Context, source VideoSource, sink FragmentSink) error {
+	codec := source.Codec()
+	if codec != CodecH264 && codec != CodecH265 {
+		return ErrRTSPUnsupportedCodec
 	}
+	sets := source.ParameterSets()
+	var muxer *FMP4Muxer
 	for {
 		au, pts, err := source.ReadAccessUnit(ctx)
 		if err != nil {
@@ -57,18 +34,24 @@ func PumpH264FMP4(ctx context.Context, source H264Source, sink FragmentSink) err
 			}
 			return err
 		}
-		if inSPS, inPPS := parameterSets(au); inSPS != nil && inPPS != nil &&
-			(muxer == nil || !bytes.Equal(inSPS, sps) || !bytes.Equal(inPPS, pps)) {
-			sps, pps = inSPS, inPPS
+		if inBand := inBandParameterSets(codec, au); inBand != nil && (muxer == nil || !sameSets(inBand, sets)) {
+			sets = inBand
 			muxer = nil
 		}
 		if muxer == nil {
-			if len(sps) == 0 || len(pps) == 0 {
+			if !validParameterSets(codec, sets) {
 				continue
 			}
-			if err := start(); err != nil {
+			next, err := NewFMP4Muxer(codec, sets)
+			if err != nil {
 				return err
 			}
+			init, err := next.Init()
+			if err != nil {
+				return err
+			}
+			muxer = next
+			sink.SetInit(next.CodecString(), init)
 		}
 		fragment, err := muxer.Write(au, pts)
 		if errors.Is(err, ErrTimestamp) {
@@ -85,17 +68,14 @@ func PumpH264FMP4(ctx context.Context, source H264Source, sink FragmentSink) err
 	}
 }
 
-func parameterSets(au [][]byte) (sps, pps []byte) {
-	for _, nalu := range au {
-		if len(nalu) == 0 {
-			continue
-		}
-		switch h264.NALUType(nalu[0] & 0x1F) {
-		case h264.NALUTypeSPS:
-			sps = nalu
-		case h264.NALUTypePPS:
-			pps = nalu
+func sameSets(a, b [][]byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !bytes.Equal(a[i], b[i]) {
+			return false
 		}
 	}
-	return sps, pps
+	return true
 }

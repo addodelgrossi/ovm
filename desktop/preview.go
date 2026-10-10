@@ -18,7 +18,7 @@ const wailsPageOrigin = "wails://wails"
 
 // PreviewSourceFactory opens a live H.264 source for a stream selection. The
 // returned release function, when non-nil, is called once the preview ends.
-type PreviewSourceFactory func(ctx context.Context, manager Manager, selection core.StreamSelection) (stream.H264Source, func(), error)
+type PreviewSourceFactory func(ctx context.Context, manager Manager, selection core.StreamSelection) (stream.VideoSource, func(), error)
 
 var errPreviewLimit = errors.New("preview limit reached")
 
@@ -102,7 +102,7 @@ func (c *previewController) start(callCtx, root context.Context, manager Manager
 
 	go func() {
 		defer c.wg.Done()
-		_ = stream.PumpH264FMP4(ctx, metered, session)
+		_ = stream.PumpFMP4(ctx, metered, session)
 		session.Close()
 		if release != nil {
 			release()

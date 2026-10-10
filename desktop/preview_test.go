@@ -13,16 +13,16 @@ import (
 	"github.com/addodelgrossi/ovm/pkg/stream"
 )
 
-func syntheticPreviewSources(context.Context, Manager, core.StreamSelection) (stream.H264Source, func(), error) {
+func syntheticPreviewSources(context.Context, Manager, core.StreamSelection) (stream.VideoSource, func(), error) {
 	source, err := synthmedia.NewH264Source(synthmedia.H264Config{Width: 64, Height: 48, FPS: 25, GOP: 25})
 	if err != nil {
 		return nil, nil, err
 	}
-	return synthmedia.NewPacedH264(source), nil, nil
+	return synthmedia.NewPaced(source), nil, nil
 }
 
 type closingLiveSource struct {
-	stream.H264Source
+	stream.VideoSource
 	closed chan struct{}
 }
 
@@ -34,10 +34,10 @@ func TestManagerPreviewSourcesOpensThroughManagerAndReleasesWithClose(t *testing
 	if err != nil {
 		t.Fatalf("synthetic source error = %v", err)
 	}
-	live := &closingLiveSource{H264Source: inner, closed: make(chan struct{})}
+	live := &closingLiveSource{VideoSource: inner, closed: make(chan struct{})}
 	var got core.StreamSelection
 	manager := newFakeManager()
-	manager.liveFn = func(_ context.Context, selection core.StreamSelection) (core.LiveH264Source, error) {
+	manager.liveFn = func(_ context.Context, selection core.StreamSelection) (stream.LiveSource, error) {
 		got = selection
 		return live, nil
 	}
@@ -131,7 +131,7 @@ func TestPreviewControllerStreamsDemoSourceAndStops(t *testing.T) {
 func TestPreviewControllerEnforcesLimitAndReleasesSources(t *testing.T) {
 	t.Parallel()
 	released := make(chan struct{}, maxConcurrentPreviews+1)
-	factory := func(context.Context, Manager, core.StreamSelection) (stream.H264Source, func(), error) {
+	factory := func(context.Context, Manager, core.StreamSelection) (stream.VideoSource, func(), error) {
 		source, _, err := syntheticPreviewSources(context.Background(), nil, core.StreamSelection{})
 		return source, func() { released <- struct{}{} }, err
 	}

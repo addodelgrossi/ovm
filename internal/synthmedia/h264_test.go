@@ -194,3 +194,26 @@ func expectedPicture(s *H264Source, index int) []byte {
 	}
 	return picture
 }
+
+func TestH265SourceLoopsTheFixture(t *testing.T) {
+	t.Parallel()
+	source, err := NewH265Source()
+	if err != nil {
+		t.Fatalf("NewH265Source() error = %v", err)
+	}
+	if source.Codec() != CodecH265 || len(source.ParameterSets()) != 3 || source.Frames() != 30 {
+		t.Fatalf("codec = %q sets = %d frames = %d", source.Codec(), len(source.ParameterSets()), source.Frames())
+	}
+	keys := 0
+	for i := 0; i < 2*source.Frames(); i++ {
+		if _, key := source.NextAccessUnit(); key {
+			if i%15 != 0 {
+				t.Fatalf("keyframe at %d, want every 15 frames", i)
+			}
+			keys++
+		}
+	}
+	if keys != 4 {
+		t.Fatalf("keyframes = %d, want 4 over two loops", keys)
+	}
+}

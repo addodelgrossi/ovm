@@ -34,7 +34,7 @@ func TestNewH264FMP4MuxerRejectsInvalidParameterSets(t *testing.T) {
 		"corrupt sps": {{0x67, 0x42}, source.PPS()},
 	}
 	for name, sets := range cases {
-		if _, err := NewH264FMP4Muxer(sets[0], sets[1]); !errors.Is(err, ErrInvalidParameterSets) {
+		if _, err := NewFMP4Muxer(CodecH264, [][]byte{sets[0], sets[1]}); !errors.Is(err, ErrInvalidParameterSets) {
 			t.Errorf("%s: error = %v, want ErrInvalidParameterSets", name, err)
 		}
 	}
@@ -43,7 +43,7 @@ func TestNewH264FMP4MuxerRejectsInvalidParameterSets(t *testing.T) {
 func TestH264FMP4MuxerInitDescribesTrack(t *testing.T) {
 	t.Parallel()
 	source := newSyntheticSource(t, synthmedia.H264Config{Width: 320, Height: 240, FPS: 15, GOP: 15})
-	muxer, err := NewH264FMP4Muxer(source.SPS(), source.PPS())
+	muxer, err := NewFMP4Muxer(CodecH264, [][]byte{source.SPS(), source.PPS()})
 	if err != nil {
 		t.Fatalf("NewH264FMP4Muxer() error = %v", err)
 	}
@@ -73,7 +73,7 @@ func TestH264FMP4MuxerInitDescribesTrack(t *testing.T) {
 func TestH264FMP4MuxerFragmentsStartAtKeyframeWithOneFrameLatency(t *testing.T) {
 	t.Parallel()
 	source := newSyntheticSource(t, synthmedia.H264Config{Width: 64, Height: 48, FPS: 10, GOP: 5})
-	muxer, err := NewH264FMP4Muxer(source.SPS(), source.PPS())
+	muxer, err := NewFMP4Muxer(CodecH264, [][]byte{source.SPS(), source.PPS()})
 	if err != nil {
 		t.Fatalf("NewH264FMP4Muxer() error = %v", err)
 	}
@@ -123,7 +123,7 @@ func TestH264FMP4MuxerRejectsChangedParameterSetsAndTimestamps(t *testing.T) {
 	t.Parallel()
 	small := newSyntheticSource(t, synthmedia.H264Config{Width: 64, Height: 48, FPS: 10, GOP: 5})
 	large := newSyntheticSource(t, synthmedia.H264Config{Width: 96, Height: 48, FPS: 10, GOP: 5})
-	muxer, err := NewH264FMP4Muxer(small.SPS(), small.PPS())
+	muxer, err := NewFMP4Muxer(CodecH264, [][]byte{small.SPS(), small.PPS()})
 	if err != nil {
 		t.Fatalf("NewH264FMP4Muxer() error = %v", err)
 	}
@@ -132,7 +132,7 @@ func TestH264FMP4MuxerRejectsChangedParameterSetsAndTimestamps(t *testing.T) {
 		t.Fatalf("Write(changed SPS) error = %v, want ErrParameterSetsChanged", err)
 	}
 
-	muxer, err = NewH264FMP4Muxer(small.SPS(), small.PPS())
+	muxer, err = NewFMP4Muxer(CodecH264, [][]byte{small.SPS(), small.PPS()})
 	if err != nil {
 		t.Fatalf("NewH264FMP4Muxer() error = %v", err)
 	}
@@ -166,7 +166,7 @@ func TestFFmpegDecodesMuxedStream(t *testing.T) {
 	}
 	t.Parallel()
 	source := newSyntheticSource(t, synthmedia.H264Config{Width: 160, Height: 96, FPS: 25, GOP: 25})
-	muxer, err := NewH264FMP4Muxer(source.SPS(), source.PPS())
+	muxer, err := NewFMP4Muxer(CodecH264, [][]byte{source.SPS(), source.PPS()})
 	if err != nil {
 		t.Fatalf("NewH264FMP4Muxer() error = %v", err)
 	}

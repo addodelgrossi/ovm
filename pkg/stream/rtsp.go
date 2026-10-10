@@ -14,9 +14,7 @@ import (
 	"github.com/bluenviron/gortsplib/v5/pkg/base"
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
-	"github.com/bluenviron/gortsplib/v5/pkg/format/rtph264"
 	"github.com/bluenviron/gortsplib/v5/pkg/liberrors"
-	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
 	"github.com/pion/rtp"
 )
 
@@ -68,12 +66,12 @@ type accessUnit struct {
 	pts   time.Duration
 }
 
-// RTSPH264Source plays the first H.264 track of an RTSP stream and implements
-// H264Source. Close must be called to release the connection.
-type RTSPH264Source struct {
+// RTSPSource plays the first H.264 or H.265 video track of an RTSP stream and
+// implements LiveSource. Close must be called to release the connection.
+type RTSPSource struct {
 	client *gortsplib.Client
-	sps    []byte
-	pps    []byte
+	codec  string
+	sets   [][]byte
 	units  chan accessUnit
 	done   chan struct{}
 
@@ -98,10 +96,10 @@ func (l *lossCounter) add(lost uint64) {
 	l.mu.Unlock()
 }
 
-// OpenRTSPH264 connects, describes, sets up the first H.264 video track, and
-// starts playing. Cancelling ctx aborts setup; after it returns, the session
+// OpenRTSP connects, describes, sets up the first H.264 or H.265 video track,
+// and starts playing. H.264 is preferred when a camera offers both. Cancelling ctx aborts setup; after it returns, the session
 // lives until Close or a transport failure.
-func OpenRTSPH264(ctx context.Context, options RTSPOptions) (*RTSPH264Source, error) {
+func OpenRTSP(ctx context.Context, options RTSPOptions) (*RTSPSource, error) {
 	target, err := parseRTSPURL(options)
 	if err != nil {
 		return nil, err
@@ -141,7 +139,7 @@ func OpenRTSPH264(ctx context.Context, options RTSPOptions) (*RTSPH264Source, er
 		}
 	}()
 
-	source, err := setupH264(client, target, loss)
+	source, err := setupVideo(client, target, loss)
 	if err != nil {
 		client.Close()
 		if ctx.Err() != nil {
@@ -152,32 +150,58 @@ func OpenRTSPH264(ctx context.Context, options RTSPOptions) (*RTSPH264Source, er
 	return source, nil
 }
 
-func setupH264(client *gortsplib.Client, target *base.URL, loss *lossCounter) (*RTSPH264Source, error) {
+// rtpDecoder turns RTP packets into access units.
+type rtpDecoder interface {
+	Decode(packet *rtp.Packet) ([][]byte, error)
+}
+
+func setupVideo(client *gortsplib.Client, target *base.URL, loss *lossCounter) (*RTSPSource, error) {
 	session, _, err := client.Describe(target)
 	if err != nil {
 		return nil, classifyRTSPError(err)
 	}
+	var (
+		media      *description.Media
+		forma      format.Format
+		decoder    rtpDecoder
+		codec      string
+		parameters [][]byte
+	)
 	var h264Format *format.H264
-	media := session.FindFormat(&h264Format)
-	if media == nil {
+	var h265Format *format.H265
+	if media = session.FindFormat(&h264Format); media != nil {
+		h264Decoder, err := h264Format.CreateDecoder()
+		if err != nil {
+			return nil, ErrRTSPProtocol
+		}
+		forma, decoder, codec = h264Format, h264Decoder, CodecH264
+		if len(h264Format.SPS) > 0 && len(h264Format.PPS) > 0 {
+			parameters = [][]byte{bytes.Clone(h264Format.SPS), bytes.Clone(h264Format.PPS)}
+		}
+	} else if media = session.FindFormat(&h265Format); media != nil {
+		h265Decoder, err := h265Format.CreateDecoder()
+		if err != nil {
+			return nil, ErrRTSPProtocol
+		}
+		forma, decoder, codec = h265Format, h265Decoder, CodecH265
+		if len(h265Format.VPS) > 0 && len(h265Format.SPS) > 0 && len(h265Format.PPS) > 0 {
+			parameters = [][]byte{bytes.Clone(h265Format.VPS), bytes.Clone(h265Format.SPS), bytes.Clone(h265Format.PPS)}
+		}
+	} else {
 		return nil, ErrRTSPUnsupportedCodec
-	}
-	decoder, err := h264Format.CreateDecoder()
-	if err != nil {
-		return nil, ErrRTSPProtocol
 	}
 	if _, err := client.Setup(session.BaseURL, media, 0, 0); err != nil {
 		return nil, classifyRTSPError(err)
 	}
-	source := &RTSPH264Source{
+	source := &RTSPSource{
 		client: client,
-		sps:    bytes.Clone(h264Format.SPS),
-		pps:    bytes.Clone(h264Format.PPS),
+		codec:  codec,
+		sets:   parameters,
 		units:  make(chan accessUnit, accessUnitQueue),
 		done:   make(chan struct{}),
 		lost:   loss,
 	}
-	client.OnPacketRTP(media, h264Format, func(packet *rtp.Packet) {
+	client.OnPacketRTP(media, forma, func(packet *rtp.Packet) {
 		source.handlePacket(media, decoder, packet)
 	})
 	if _, err := client.Play(nil); err != nil {
@@ -190,7 +214,7 @@ func setupH264(client *gortsplib.Client, target *base.URL, loss *lossCounter) (*
 	return source, nil
 }
 
-func (s *RTSPH264Source) handlePacket(media *description.Media, decoder *rtph264.Decoder, packet *rtp.Packet) {
+func (s *RTSPSource) handlePacket(media *description.Media, decoder rtpDecoder, packet *rtp.Packet) {
 	ticks, ok := s.client.PacketPTS(media, packet)
 	if !ok {
 		return
@@ -204,7 +228,7 @@ func (s *RTSPH264Source) handlePacket(media *description.Media, decoder *rtph264
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.dropping {
-		if !h264.IsRandomAccess(nalus) {
+		if !isRandomAccess(s.codec, nalus) {
 			return
 		}
 		s.dropping = false
@@ -216,14 +240,15 @@ func (s *RTSPH264Source) handlePacket(media *description.Media, decoder *rtph264
 	}
 }
 
-// SPS returns the sequence parameter set from the session description, if any.
-func (s *RTSPH264Source) SPS() []byte { return s.sps }
+// Codec returns CodecH264 or CodecH265.
+func (s *RTSPSource) Codec() string { return s.codec }
 
-// PPS returns the picture parameter set from the session description, if any.
-func (s *RTSPH264Source) PPS() []byte { return s.pps }
+// ParameterSets returns the parameter sets from the session description, if
+// it carried a complete set.
+func (s *RTSPSource) ParameterSets() [][]byte { return s.sets }
 
 // ReadAccessUnit returns the next decoded access unit.
-func (s *RTSPH264Source) ReadAccessUnit(ctx context.Context) ([][]byte, time.Duration, error) {
+func (s *RTSPSource) ReadAccessUnit(ctx context.Context) ([][]byte, time.Duration, error) {
 	select {
 	case unit := <-s.units:
 		return unit.nalus, unit.pts, nil
@@ -237,19 +262,19 @@ func (s *RTSPH264Source) ReadAccessUnit(ctx context.Context) ([][]byte, time.Dur
 }
 
 // LostPackets reports RTP packets the client detected as lost.
-func (s *RTSPH264Source) LostPackets() uint64 {
+func (s *RTSPSource) LostPackets() uint64 {
 	s.lost.mu.Lock()
 	defer s.lost.mu.Unlock()
 	return s.lost.lost
 }
 
 // Close ends the session. It is idempotent.
-func (s *RTSPH264Source) Close() {
+func (s *RTSPSource) Close() {
 	s.client.Close()
 	s.fail(ErrRTSPClosed)
 }
 
-func (s *RTSPH264Source) fail(err error) {
+func (s *RTSPSource) fail(err error) {
 	s.closeOnce.Do(func() {
 		s.mu.Lock()
 		s.err = err

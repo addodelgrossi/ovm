@@ -7,6 +7,7 @@ import (
 
 	core "github.com/addodelgrossi/ovm/internal/app"
 	"github.com/addodelgrossi/ovm/internal/store"
+	"github.com/addodelgrossi/ovm/pkg/stream"
 )
 
 type fakeManager struct {
@@ -23,7 +24,7 @@ type fakeManager struct {
 	overviewFn    func(context.Context) (core.Overview, error)
 	profilesFn    func(context.Context, string) (core.MediaProfilesResult, error)
 	resolveFn     func(context.Context, core.StreamSelection) (string, error)
-	liveFn        func(context.Context, core.StreamSelection) (core.LiveH264Source, error)
+	liveFn        func(context.Context, core.StreamSelection) (stream.LiveSource, error)
 	preferencesFn func(context.Context, core.PreferencesRequest) (core.Overview, error)
 	closeFn       func() error
 }
@@ -136,7 +137,7 @@ func (f *fakeManager) ResolveStreamURI(ctx context.Context, selection core.Strea
 	return "", nil
 }
 
-func (f *fakeManager) OpenLiveStream(ctx context.Context, selection core.StreamSelection) (core.LiveH264Source, error) {
+func (f *fakeManager) OpenLiveStream(ctx context.Context, selection core.StreamSelection) (stream.LiveSource, error) {
 	f.called("live")
 	if f.liveFn != nil {
 		return f.liveFn(ctx, selection)

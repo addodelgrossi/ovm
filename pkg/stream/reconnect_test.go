@@ -23,7 +23,7 @@ func (c *closableScript) LostPackets() uint64 { return c.lost }
 func scriptFrom(t *testing.T, frames int, skip int, ptsStart time.Duration, end error) *closableScript {
 	t.Helper()
 	source := newSyntheticSource(t, synthmedia.H264Config{Width: 64, Height: 48, FPS: 25, GOP: 5})
-	script := &closableScript{scriptedSource: scriptedSource{sps: source.SPS(), pps: source.PPS(), err: end}}
+	script := &closableScript{scriptedSource: scriptedSource{codec: CodecH264, sets: source.ParameterSets(), err: end}}
 	for i := 0; i < skip; i++ {
 		source.NextAccessUnit()
 	}

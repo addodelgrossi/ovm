@@ -11,15 +11,21 @@ import (
 )
 
 type scriptedSource struct {
-	sps, pps []byte
-	units    [][][]byte
-	pts      []time.Duration
-	index    int
-	err      error
+	codec string
+	sets  [][]byte
+	units [][][]byte
+	pts   []time.Duration
+	index int
+	err   error
 }
 
-func (s *scriptedSource) SPS() []byte { return s.sps }
-func (s *scriptedSource) PPS() []byte { return s.pps }
+func (s *scriptedSource) Codec() string {
+	if s.codec == "" {
+		return CodecH264
+	}
+	return s.codec
+}
+func (s *scriptedSource) ParameterSets() [][]byte { return s.sets }
 
 func (s *scriptedSource) ReadAccessUnit(ctx context.Context) ([][]byte, time.Duration, error) {
 	if s.index == len(s.units) {
@@ -79,9 +85,9 @@ func TestPumpRepublishesInitWhenParameterSetsChange(t *testing.T) {
 	)
 	source.err = errors.New("source ended")
 	sink := &recordingSink{}
-	err := PumpH264FMP4(context.Background(), source, sink)
+	err := PumpFMP4(context.Background(), source, sink)
 	if err == nil || err.Error() != "source ended" {
-		t.Fatalf("PumpH264FMP4() error = %v, want source error", err)
+		t.Fatalf("PumpFMP4() error = %v, want source error", err)
 	}
 	if len(sink.codecs) != 2 {
 		t.Fatalf("SetInit called %d times, want 2", len(sink.codecs))
@@ -98,13 +104,13 @@ func TestPumpReturnsContextErrorOnCancellation(t *testing.T) {
 	sink := &recordingSink{}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- PumpH264FMP4(ctx, source, sink) }()
+	go func() { done <- PumpFMP4(ctx, source, sink) }()
 	time.Sleep(20 * time.Millisecond)
 	cancel()
 	select {
 	case err := <-done:
 		if !errors.Is(err, context.Canceled) {
-			t.Fatalf("PumpH264FMP4() error = %v, want context.Canceled", err)
+			t.Fatalf("PumpFMP4() error = %v, want context.Canceled", err)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("pump did not stop after cancellation")
@@ -120,7 +126,7 @@ func TestPumpWaitsForInBandParameterSets(t *testing.T) {
 	source.pts = source.pts[1:]
 	source.err = errors.New("eof")
 	sink := &recordingSink{}
-	_ = PumpH264FMP4(context.Background(), source, sink)
+	_ = PumpFMP4(context.Background(), source, sink)
 	if len(sink.codecs) != 0 || sink.fragments != 0 {
 		t.Fatalf("pump published without parameter sets: %+v", sink)
 	}

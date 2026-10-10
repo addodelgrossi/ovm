@@ -5,32 +5,47 @@ import (
 	"time"
 )
 
-// PacedH264 releases the synthetic stream in real time, as a camera would.
-type PacedH264 struct {
-	source *H264Source
-	start  time.Time
-	frames int
-	now    func() time.Time
+// Codec names match pkg/stream's VideoSource codecs.
+const (
+	CodecH264 = "h264"
+	CodecH265 = "h265"
+)
+
+// FrameGenerator produces an endless sequence of access units.
+type FrameGenerator interface {
+	Codec() string
+	ParameterSets() [][]byte
+	FrameDuration() time.Duration
+	NextAccessUnit() ([][]byte, bool)
 }
 
-// NewPacedH264 starts the real-time clock at the first read.
-func NewPacedH264(source *H264Source) *PacedH264 {
-	return &PacedH264{source: source, now: time.Now}
+// Paced releases a generator's stream in real time, as a camera would. It
+// implements pkg/stream's VideoSource.
+type Paced struct {
+	generator FrameGenerator
+	start     time.Time
+	frames    int
+	now       func() time.Time
 }
 
-// SPS returns the sequence parameter set.
-func (p *PacedH264) SPS() []byte { return p.source.SPS() }
+// NewPaced starts the real-time clock at the first read.
+func NewPaced(generator FrameGenerator) *Paced {
+	return &Paced{generator: generator, now: time.Now}
+}
 
-// PPS returns the picture parameter set.
-func (p *PacedH264) PPS() []byte { return p.source.PPS() }
+// Codec returns the generator's codec.
+func (p *Paced) Codec() string { return p.generator.Codec() }
+
+// ParameterSets returns the generator's parameter sets.
+func (p *Paced) ParameterSets() [][]byte { return p.generator.ParameterSets() }
 
 // ReadAccessUnit waits until the next frame is due and returns it with its
 // presentation timestamp relative to the first frame.
-func (p *PacedH264) ReadAccessUnit(ctx context.Context) ([][]byte, time.Duration, error) {
+func (p *Paced) ReadAccessUnit(ctx context.Context) ([][]byte, time.Duration, error) {
 	if p.frames == 0 {
 		p.start = p.now()
 	}
-	pts := time.Duration(p.frames) * p.source.FrameDuration()
+	pts := time.Duration(p.frames) * p.generator.FrameDuration()
 	if wait := p.start.Add(pts).Sub(p.now()); wait > 0 {
 		timer := time.NewTimer(wait)
 		select {
@@ -43,6 +58,6 @@ func (p *PacedH264) ReadAccessUnit(ctx context.Context) ([][]byte, time.Duration
 		return nil, 0, err
 	}
 	p.frames++
-	au, _ := p.source.NextAccessUnit()
+	au, _ := p.generator.NextAccessUnit()
 	return au, pts, nil
 }

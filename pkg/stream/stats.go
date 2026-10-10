@@ -4,8 +4,6 @@ import (
 	"context"
 	"sync"
 	"time"
-
-	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
 )
 
 // statsWindow is the sliding window for frame rate and bitrate.
@@ -73,24 +71,23 @@ func NewMeter(now func() time.Time) *Meter {
 	return &Meter{now: now, started: now()}
 }
 
-// Observe records one access unit with its presentation timestamp.
-func (m *Meter) Observe(au [][]byte, pts time.Duration) {
+// Observe records one access unit of codec with its presentation timestamp.
+func (m *Meter) Observe(codec string, au [][]byte, pts time.Duration) {
 	size := 0
 	var sps []byte
 	for _, nalu := range au {
 		size += len(nalu)
-		if len(nalu) > 0 && h264.NALUType(nalu[0]&0x1F) == h264.NALUTypeSPS {
+		if classifyNALU(codec, nalu) == naluSPS {
 			sps = nalu
 		}
 	}
-	key := h264.IsRandomAccess(au)
+	key := isRandomAccess(codec, au)
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if sps != nil {
-		var parsed h264.SPS
-		if parsed.Unmarshal(sps) == nil {
-			m.width, m.height = parsed.Width(), parsed.Height()
+		if width, height, ok := pictureSize(codec, sps); ok {
+			m.width, m.height = width, height
 		}
 	}
 	if key && !m.haveKey {
@@ -161,16 +158,16 @@ func (m *Meter) Snapshot() Stats {
 	return stats
 }
 
-// MeteredSource measures every access unit read from an H264Source. When the
+// MeteredSource measures every access unit read from a VideoSource. When the
 // wrapped source reports RTP loss (LostPackets) or reconnections
 // (Reconnects), the meter includes them.
 type MeteredSource struct {
-	H264Source
+	VideoSource
 	meter *Meter
 }
 
 // NewMeteredSource wraps source with meter.
-func NewMeteredSource(source H264Source, meter *Meter) *MeteredSource {
+func NewMeteredSource(source VideoSource, meter *Meter) *MeteredSource {
 	meter.mu.Lock()
 	if loss, ok := source.(interface{ LostPackets() uint64 }); ok {
 		meter.lossSource = loss
@@ -179,14 +176,14 @@ func NewMeteredSource(source H264Source, meter *Meter) *MeteredSource {
 		meter.retrySource = retry
 	}
 	meter.mu.Unlock()
-	return &MeteredSource{H264Source: source, meter: meter}
+	return &MeteredSource{VideoSource: source, meter: meter}
 }
 
 // ReadAccessUnit reads from the wrapped source and records the access unit.
 func (s *MeteredSource) ReadAccessUnit(ctx context.Context) ([][]byte, time.Duration, error) {
-	au, pts, err := s.H264Source.ReadAccessUnit(ctx)
+	au, pts, err := s.VideoSource.ReadAccessUnit(ctx)
 	if err == nil {
-		s.meter.Observe(au, pts)
+		s.meter.Observe(s.Codec(), au, pts)
 	}
 	return au, pts, err
 }

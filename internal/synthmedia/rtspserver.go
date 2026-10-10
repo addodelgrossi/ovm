@@ -13,42 +13,99 @@ import (
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
 	"github.com/bluenviron/gortsplib/v5/pkg/liberrors"
+	"github.com/pion/rtp"
 )
 
 // RTSPServerConfig configures a loopback RTSP server for the synthetic stream.
 type RTSPServerConfig struct {
+	// Codec selects CodecH264 (the default, generated from Video) or CodecH265
+	// (the embedded fixture; Video is ignored).
+	Codec string
 	Video H264Config
+	// Route, when set, chooses the codec for each request from its path and
+	// query; both codecs are then served. It must return CodecH264 or
+	// CodecH265.
+	Route func(path, query string) string
 	// Username and Password, when set, are required from every reader.
 	Username string
 	Password string
-	// SDPParameterSets advertises the SPS and PPS in the session description.
+	// SDPParameterSets advertises the parameter sets in the session description.
 	// Without them a client must wait for the in-band parameter sets.
 	SDPParameterSets bool
 }
 
-// RTSPServer serves the synthetic H.264 stream on any path over RTSP/TCP. It
-// binds only to 127.0.0.1 and exists for tests and the desktop demo.
+// RTSPServer serves synthetic H.264 and H.265 streams on any path over
+// RTSP/TCP. It binds only to 127.0.0.1 and exists for tests and the desktop
+// demo.
 type RTSPServer struct {
-	server *gortsplib.Server
-	stream *gortsplib.ServerStream
-	config RTSPServerConfig
-	port   int
-	cancel context.CancelFunc
-	done   chan struct{}
-	once   sync.Once
+	server  *gortsplib.Server
+	streams map[string]*gortsplib.ServerStream
+	port    int
+	cancel  context.CancelFunc
+	pumps   sync.WaitGroup
+	once    sync.Once
 }
 
-// StartRTSPServer starts the server and its real-time frame pump.
+type codecStream struct {
+	generator FrameGenerator
+	format    format.Format
+	encoder   rtpEncoder
+}
+
+func newCodecStream(codec string, video H264Config, sdpParameterSets bool) (*codecStream, error) {
+	switch codec {
+	case CodecH264:
+		source, err := NewH264Source(video)
+		if err != nil {
+			return nil, err
+		}
+		h264Format := &format.H264{PayloadTyp: 96, PacketizationMode: 1}
+		if sdpParameterSets {
+			h264Format.SPS, h264Format.PPS = source.SPS(), source.PPS()
+		}
+		encoder, err := h264Format.CreateEncoder()
+		if err != nil {
+			return nil, err
+		}
+		return &codecStream{generator: source, format: h264Format, encoder: encoder}, nil
+	case CodecH265:
+		source, err := NewH265Source()
+		if err != nil {
+			return nil, err
+		}
+		h265Format := &format.H265{PayloadTyp: 96}
+		if sdpParameterSets {
+			sets := source.ParameterSets()
+			h265Format.VPS, h265Format.SPS, h265Format.PPS = sets[0], sets[1], sets[2]
+		}
+		encoder, err := h265Format.CreateEncoder()
+		if err != nil {
+			return nil, err
+		}
+		return &codecStream{generator: source, format: h265Format, encoder: encoder}, nil
+	default:
+		return nil, errors.New("synthmedia: unsupported RTSP server codec")
+	}
+}
+
+// StartRTSPServer starts the server and its real-time frame pumps.
 func StartRTSPServer(config RTSPServerConfig) (*RTSPServer, error) {
-	source, err := NewH264Source(config.Video)
-	if err != nil {
-		return nil, err
+	if config.Codec == "" {
+		config.Codec = CodecH264
 	}
-	videoFormat := &format.H264{PayloadTyp: 96, PacketizationMode: 1}
-	if config.SDPParameterSets {
-		videoFormat.SPS = source.SPS()
-		videoFormat.PPS = source.PPS()
+	codecList := []string{config.Codec}
+	if config.Route != nil {
+		codecList = []string{CodecH264, CodecH265}
 	}
+	sources := make(map[string]*codecStream, len(codecList))
+	for _, codec := range codecList {
+		source, err := newCodecStream(codec, config.Video, config.SDPParameterSets)
+		if err != nil {
+			return nil, err
+		}
+		sources[codec] = source
+	}
+
 	handler := &rtspHandler{config: config}
 	server := &gortsplib.Server{
 		Handler:     handler,
@@ -58,34 +115,36 @@ func StartRTSPServer(config RTSPServerConfig) (*RTSPServer, error) {
 	if err := server.Start(); err != nil {
 		return nil, err
 	}
-	stream := &gortsplib.ServerStream{
-		Server: server,
-		Desc: &description.Session{Medias: []*description.Media{{
-			Type:    description.MediaTypeVideo,
-			Formats: []format.Format{videoFormat},
-		}}},
+	instance := &RTSPServer{server: server, streams: make(map[string]*gortsplib.ServerStream, len(sources))}
+	for codec, source := range sources {
+		stream := &gortsplib.ServerStream{
+			Server: server,
+			Desc: &description.Session{Medias: []*description.Media{{
+				Type:    description.MediaTypeVideo,
+				Formats: []format.Format{source.format},
+			}}},
+		}
+		if err := stream.Initialize(); err != nil {
+			instance.closeStreams()
+			server.Close()
+			return nil, err
+		}
+		instance.streams[codec] = stream
 	}
-	if err := stream.Initialize(); err != nil {
-		server.Close()
-		return nil, err
-	}
-	handler.stream = stream
+	handler.streams = instance.streams
 	address, ok := server.NetListener().Addr().(*net.TCPAddr)
 	if !ok {
-		stream.Close()
+		instance.closeStreams()
 		server.Close()
 		return nil, errors.New("synthmedia: unexpected RTSP listener address")
 	}
+	instance.port = address.Port
 	ctx, cancel := context.WithCancel(context.Background())
-	instance := &RTSPServer{
-		server: server,
-		stream: stream,
-		config: config,
-		port:   address.Port,
-		cancel: cancel,
-		done:   make(chan struct{}),
+	instance.cancel = cancel
+	for codec, source := range sources {
+		instance.pumps.Add(1)
+		go instance.pump(ctx, instance.streams[codec], source)
 	}
-	go instance.pump(ctx, source, videoFormat)
 	return instance, nil
 }
 
@@ -97,30 +156,37 @@ func (s *RTSPServer) URL(path string) string {
 	return "rtsp://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(s.port)) + path
 }
 
-// Close stops the pump and the server. It is idempotent.
+// Close stops the pumps and the server. It is idempotent.
 func (s *RTSPServer) Close() {
 	s.once.Do(func() {
 		s.cancel()
-		<-s.done
-		s.stream.Close()
+		s.pumps.Wait()
+		s.closeStreams()
 		s.server.Close()
 	})
 }
 
-func (s *RTSPServer) pump(ctx context.Context, source *H264Source, videoFormat *format.H264) {
-	defer close(s.done)
-	encoder, err := videoFormat.CreateEncoder()
-	if err != nil {
-		return
+func (s *RTSPServer) closeStreams() {
+	for _, stream := range s.streams {
+		stream.Close()
 	}
-	paced := NewPacedH264(source)
-	media := s.stream.Desc.Medias[0]
+}
+
+// rtpEncoder turns access units into RTP packets.
+type rtpEncoder interface {
+	Encode(au [][]byte) ([]*rtp.Packet, error)
+}
+
+func (s *RTSPServer) pump(ctx context.Context, stream *gortsplib.ServerStream, source *codecStream) {
+	defer s.pumps.Done()
+	paced := NewPaced(source.generator)
+	media := stream.Desc.Medias[0]
 	for {
 		au, pts, err := paced.ReadAccessUnit(ctx)
 		if err != nil {
 			return
 		}
-		packets, err := encoder.Encode(au)
+		packets, err := source.encoder.Encode(au)
 		if err != nil {
 			return
 		}
@@ -128,14 +194,24 @@ func (s *RTSPServer) pump(ctx context.Context, source *H264Source, videoFormat *
 		timestamp := uint32(ticks) //nolint:gosec // RTP timestamps wrap by design
 		for _, packet := range packets {
 			packet.Timestamp = timestamp
-			_ = s.stream.WritePacketRTP(media, packet)
+			_ = stream.WritePacketRTP(media, packet)
 		}
 	}
 }
 
 type rtspHandler struct {
-	config RTSPServerConfig
-	stream *gortsplib.ServerStream
+	config  RTSPServerConfig
+	streams map[string]*gortsplib.ServerStream
+}
+
+func (h *rtspHandler) route(path, query string) *gortsplib.ServerStream {
+	if h.config.Route != nil {
+		if stream := h.streams[h.config.Route(path, query)]; stream != nil {
+			return stream
+		}
+		return h.streams[CodecH264]
+	}
+	return h.streams[h.config.Codec]
 }
 
 func (h *rtspHandler) authorized(conn *gortsplib.ServerConn, request *base.Request) bool {
@@ -150,7 +226,7 @@ func (h *rtspHandler) OnDescribe(ctx *gortsplib.ServerHandlerOnDescribeCtx) (*ba
 	if !h.authorized(ctx.Conn, ctx.Request) {
 		return &base.Response{StatusCode: base.StatusUnauthorized}, nil, liberrors.ErrServerAuth{}
 	}
-	return &base.Response{StatusCode: base.StatusOK}, h.stream, nil
+	return &base.Response{StatusCode: base.StatusOK}, h.route(ctx.Path, ctx.Query), nil
 }
 
 // OnSetup implements gortsplib.ServerHandlerOnSetup.
@@ -158,7 +234,7 @@ func (h *rtspHandler) OnSetup(ctx *gortsplib.ServerHandlerOnSetupCtx) (*base.Res
 	if !h.authorized(ctx.Conn, ctx.Request) {
 		return &base.Response{StatusCode: base.StatusUnauthorized}, nil, liberrors.ErrServerAuth{}
 	}
-	return &base.Response{StatusCode: base.StatusOK}, h.stream, nil
+	return &base.Response{StatusCode: base.StatusOK}, h.route(ctx.Path, ctx.Query), nil
 }
 
 // OnPlay implements gortsplib.ServerHandlerOnPlay.

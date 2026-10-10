@@ -66,6 +66,12 @@ func NewH264Source(config H264Config) (*H264Source, error) {
 	return source, nil
 }
 
+// Codec returns CodecH264.
+func (s *H264Source) Codec() string { return CodecH264 }
+
+// ParameterSets returns copies of the SPS and PPS.
+func (s *H264Source) ParameterSets() [][]byte { return [][]byte{s.SPS(), s.PPS()} }
+
 // SPS returns a copy of the sequence parameter set NAL unit.
 func (s *H264Source) SPS() []byte { return append([]byte(nil), s.sps...) }
 

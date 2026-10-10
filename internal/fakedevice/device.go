@@ -38,6 +38,11 @@ type Device struct {
 	digestNonce       string
 	digestNC          map[string]uint64
 	digestStaleIssued bool
+	// initial is the configuration a factory reset returns to.
+	initial normalizedConfig
+	// rebootUntil makes the device unavailable during a simulated reboot.
+	rebootUntil time.Time
+	reboots     int
 }
 
 // New creates a fake device. Configuration maps are copied.
@@ -54,6 +59,7 @@ func New(config Config) (*Device, error) {
 		digestNC:          make(map[string]uint64),
 	}
 	device.current.Store(&normalized)
+	device.initial = normalized
 	// A Digest nonce is only required when HTTP Digest authentication is
 	// active. Generating one unconditionally would waste entropy and imply a
 	// challenge the device never issues.
@@ -78,6 +84,11 @@ func (d *Device) cfg() *normalizedConfig { return d.current.Load() }
 // (Basic/Digest/none) but never requires a WS-Security UsernameToken, matching
 // a real camera's plain HTTP GET snapshot URI.
 func (d *Device) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+	if d.rebooting() {
+		// A rebooting camera drops connections; closing without a response
+		// is the closest an HTTP handler can come.
+		panic(http.ErrAbortHandler)
+	}
 	if request.Method == http.MethodGet && d.isSnapshotPath(request.URL.Path) {
 		d.serveSnapshot(response, request)
 		return
@@ -401,7 +412,8 @@ func (d *Device) validateUsernameToken(token *usernameTokenWire) bool {
 	// valid RFC3339 lexical value, so unlike display-oriented fields it is not
 	// whitespace-trimmed or re-serialized before parsing and hashing.
 	createdText := token.Created.Value
-	if !secureEqual(username, d.cfg().Username) || passwordDigest == "" || nonceText == "" || createdText == "" {
+	userPassword, known := d.cfg().credential(username)
+	if !known || passwordDigest == "" || nonceText == "" || createdText == "" {
 		return false
 	}
 	if token.Password.Type != passwordDigestURI || token.Nonce.EncodingType != base64BinaryURI {
@@ -427,10 +439,10 @@ func (d *Device) validateUsernameToken(token *usernameTokenWire) bool {
 	// PasswordDigest = Base64( SHA1( nonce + createdBytes + password ) ), using
 	// the exact transmitted Created bytes so a semantically valid offset or
 	// fractional-second timestamp verifies against the digest the client built.
-	digestInput := make([]byte, 0, len(rawNonce)+len(createdText)+len(d.cfg().Password))
+	digestInput := make([]byte, 0, len(rawNonce)+len(createdText)+len(userPassword))
 	digestInput = append(digestInput, rawNonce...)
 	digestInput = append(digestInput, createdText...)
-	digestInput = append(digestInput, d.cfg().Password...)
+	digestInput = append(digestInput, userPassword...)
 	digest := sha1.Sum(digestInput) // #nosec G401 -- mandated by the WS-Security PasswordDigest formula.
 	expected := base64.StdEncoding.EncodeToString(digest[:])
 	if subtle.ConstantTimeCompare([]byte(passwordDigest), []byte(expected)) != 1 {

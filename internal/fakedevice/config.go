@@ -143,6 +143,10 @@ type Config struct {
 	// value is filled with defaults.
 	MediaInventory MediaInventory
 
+	// Settings is the mutable device-management state (time, NTP, users,
+	// gateway, DNS, reboot, and logs). A zero value receives defaults.
+	Settings DeviceSettings
+
 	// Imaging supplies synthetic Imaging ver20 settings. A zero value is
 	// filled with one AUTO video source.
 	Imaging ImagingInventory
@@ -259,6 +263,7 @@ func normalizeConfig(config Config) (normalizedConfig, error) {
 		return normalizedConfig{}, err
 	}
 	config.Imaging = config.Imaging.withDefaults()
+	config.Settings = config.Settings.withDefaults(config.Username, config.Password)
 	config.MediaInventory = config.MediaInventory.withDefaults()
 	if err := validateMediaInventory(config.MediaInventory); err != nil {
 		return normalizedConfig{}, err

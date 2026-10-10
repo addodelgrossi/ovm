@@ -20,7 +20,8 @@ func (d *Device) authorizeHTTP(response http.ResponseWriter, request *http.Reque
 		return true
 	case HTTPAuthBasic:
 		username, password, ok := request.BasicAuth()
-		if ok && secureEqual(username, d.cfg().Username) && secureEqual(password, d.cfg().Password) {
+		userPassword, known := d.cfg().credential(username)
+		if ok && known && secureEqual(password, userPassword) {
 			return true
 		}
 		response.Header().Set("WWW-Authenticate", `Basic realm="`+quoteHeaderValue(d.cfg().DigestRealm)+`"`)
@@ -68,7 +69,8 @@ func (d *Device) authorizeDigest(response http.ResponseWriter, request *http.Req
 }
 
 func (d *Device) verifyDigestParameters(parameters map[string]string, request *http.Request) bool {
-	if !secureEqual(parameters["username"], d.cfg().Username) ||
+	userPassword, known := d.cfg().credential(parameters["username"])
+	if !known ||
 		parameters["realm"] != d.cfg().DigestRealm ||
 		!strings.EqualFold(parameters["algorithm"], d.cfg().DigestAlgorithm) ||
 		parameters["qop"] != "auth" ||
@@ -89,7 +91,7 @@ func (d *Device) verifyDigestParameters(parameters map[string]string, request *h
 		_, _ = io.WriteString(digest, value)
 		return hex.EncodeToString(digest.Sum(nil))
 	}
-	ha1 := hashText(d.cfg().Username + ":" + d.cfg().DigestRealm + ":" + d.cfg().Password)
+	ha1 := hashText(parameters["username"] + ":" + d.cfg().DigestRealm + ":" + userPassword)
 	ha2 := hashText(request.Method + ":" + parameters["uri"])
 	expected := hashText(strings.Join([]string{ha1, parameters["nonce"], parameters["nc"], parameters["cnonce"], "auth", ha2}, ":"))
 	if !secureEqual(parameters["response"], expected) {

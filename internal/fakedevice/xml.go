@@ -291,7 +291,12 @@ func buildFault(config normalizedConfig, version SOAPVersion, fault FaultSpec) s
 func buildSystemDateAndTime(config normalizedConfig, value time.Time) string {
 	prefix := config.OperationPrefix
 	value = value.UTC()
-	return `<` + prefix + `:GetSystemDateAndTimeResponse><` + prefix + `:SystemDateAndTime><tt:DateTimeType>Manual</tt:DateTimeType><tt:DaylightSavings>false</tt:DaylightSavings><tt:UTCDateTime><tt:Time><tt:Hour>` + strconv.Itoa(value.Hour()) + `</tt:Hour><tt:Minute>` + strconv.Itoa(value.Minute()) + `</tt:Minute><tt:Second>` + strconv.Itoa(value.Second()) + `</tt:Second></tt:Time><tt:Date><tt:Year>` + strconv.Itoa(value.Year()) + `</tt:Year><tt:Month>` + strconv.Itoa(int(value.Month())) + `</tt:Month><tt:Day>` + strconv.Itoa(value.Day()) + `</tt:Day></tt:Date></tt:UTCDateTime></` + prefix + `:SystemDateAndTime></` + prefix + `:GetSystemDateAndTimeResponse>`
+	settings := config.Settings
+	timeZone := ""
+	if settings.TimeZone != "" {
+		timeZone = `<tt:TimeZone><tt:TZ>` + escapeXML(settings.TimeZone) + `</tt:TZ></tt:TimeZone>`
+	}
+	return `<` + prefix + `:GetSystemDateAndTimeResponse><` + prefix + `:SystemDateAndTime><tt:DateTimeType>` + escapeXML(settings.DateTimeType) + `</tt:DateTimeType><tt:DaylightSavings>` + strconv.FormatBool(settings.DaylightSavings) + `</tt:DaylightSavings>` + timeZone + `<tt:UTCDateTime><tt:Time><tt:Hour>` + strconv.Itoa(value.Hour()) + `</tt:Hour><tt:Minute>` + strconv.Itoa(value.Minute()) + `</tt:Minute><tt:Second>` + strconv.Itoa(value.Second()) + `</tt:Second></tt:Time><tt:Date><tt:Year>` + strconv.Itoa(value.Year()) + `</tt:Year><tt:Month>` + strconv.Itoa(int(value.Month())) + `</tt:Month><tt:Day>` + strconv.Itoa(value.Day()) + `</tt:Day></tt:Date></tt:UTCDateTime></` + prefix + `:SystemDateAndTime></` + prefix + `:GetSystemDateAndTimeResponse>`
 }
 
 func buildGetState(_ normalizedConfig, key, value string, present bool) string {

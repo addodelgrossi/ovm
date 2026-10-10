@@ -1,6 +1,6 @@
 # ovm v0.1.0 Implementation Plan
 
-Status: **M4 — Video in progress**
+Status: **M4 — Video complete; M5 — Configuration next**
 Last updated: 2026-10-10
 
 ## Product goal
@@ -124,7 +124,7 @@ available and always report method and uncertainty. A result is
 | M1 ONVIF Core + CLI | Complete | SOAP, auth, discovery, Device info, fake device, `discover`/`info` | Passed locally and in GitHub Actions on macOS/Ubuntu |
 | M2 Media | Complete | Media/Media2 reads, URLs, snapshots, `profiles`/`snapshot` | Passed locally and in GitHub Actions on macOS/Ubuntu |
 | M3 Desktop Base | Complete | Wails UI, persistence, Keychain, sidebar, Overview, Streams, demo | Discover and copy RTSP end to end |
-| M4 Video | In progress | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
+| M4 Video | Complete | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
 | M5 Configuration | Planned | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |
 | M6 Diagnostics | Planned | SOAP console, Events, clock/stability, reports, Quick Setup, palette | Complete redacted reports |
 | M7 Distribution | Planned/blocked on hardware | macOS/Linux packages, CLI releases, two-camera gate, GitHub release | Physical acceptance and green release workflow |
@@ -218,8 +218,9 @@ with full screen, and runs 30-second probes; `ovm probe` exposes the same
 measurement in the CLI. The demo serves its main profile as H.265 and others as
 H.264 from an authenticated loopback RTSP server. Evidence is synthetic:
 `internal/synthmedia` generates lossless H.264 and embeds a small project-owned
-H.265 fixture. M4 remains **In progress** until remote CI passes and recording
-and probing are exercised in the native app. Known limits: audio is not
+H.265 fixture. Local and remote CI pass on macOS and Ubuntu, and preview of
+both codecs, statistics, the grid, recording, and probing were exercised in
+the native macOS app in demo mode. Known limits: audio is not
 previewed or recorded; Linux WebKitGTK playback has not been verified natively.
 
 ### M5 — Configuration

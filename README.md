@@ -26,11 +26,10 @@ remote cloud access.
 
 See [the implementation plan](docs/PLAN.md) and
 [ADR 0001](docs/adr/0001-stack-and-architecture.md). Milestones M0 (foundation),
-M1 (ONVIF core and CLI), M2 (media and snapshots), and M3 (desktop base) are
-complete. Milestone M4 (video) is **in progress**: RTSP live preview with
-H.264/H.265, measured statistics, reconnection, JPEG fallback, a four-camera
-grid, clip recording, and the `probe` command are implemented and pass local
-and remote synthetic tests. No physical camera has been verified.
+M1 (ONVIF core and CLI), M2 (media and snapshots), M3 (desktop base), and M4
+(video: RTSP live preview with H.264/H.265, measured statistics, reconnection,
+JPEG fallback, a four-camera grid, clip recording, and the `probe` command) are
+complete. M5 (configuration) is next. No physical camera has been verified.
 
 ## Commands
 

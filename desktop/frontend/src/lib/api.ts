@@ -13,6 +13,8 @@ import {
   Scan,
   SelectDevice,
   StartPreview,
+  StartRecording,
+  StopRecording,
   StartSnapshotPreview,
   StopPreview,
   UpdatePreferences
@@ -88,6 +90,12 @@ export interface PreviewStats {
   reconnects: number
   elapsed_ms: number
   first_frame_received: boolean
+}
+
+export interface RecordingResult {
+  path: string
+  bytes: number
+  interrupted: boolean
 }
 
 export interface PreviewSession {
@@ -329,6 +337,8 @@ export interface OvmApi {
     profileToken: string
   ): Promise<ApiResponse<PreviewSession>>
   previewStats(sessionId: string): Promise<ApiResponse<PreviewStats>>
+  startRecording(sessionId: string): Promise<ApiResponse<RecordingResult>>
+  stopRecording(sessionId: string): Promise<ApiResponse<RecordingResult>>
 }
 
 interface BindingEnvelope<T> {
@@ -417,6 +427,10 @@ export const api: OvmApi = {
     invoke<{ completed: boolean }>(() =>
       StopPreview({ session_id: sessionId })
     ),
+  startRecording: (sessionId) =>
+    invoke<RecordingResult>(() => StartRecording({ session_id: sessionId })),
+  stopRecording: (sessionId) =>
+    invoke<RecordingResult>(() => StopRecording({ session_id: sessionId })),
   previewStats: (sessionId) =>
     invoke<PreviewStats>(() => ReadPreviewStats({ session_id: sessionId })),
   async copyText(text) {

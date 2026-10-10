@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"time"
 
 	core "github.com/addodelgrossi/ovm/internal/app"
+	"github.com/addodelgrossi/ovm/pkg/stream"
 )
 
 // BindingError is the only error shape returned by exported desktop methods.
@@ -148,6 +150,23 @@ type StartPreviewResponse struct {
 
 type StopPreviewRequest struct {
 	SessionID string `json:"session_id"`
+}
+
+type RecordingRequest struct {
+	SessionID string `json:"session_id"`
+}
+
+// RecordingResult describes a published clip. Interrupted marks a clip cut
+// short by a codec change, the size limit, or the stream ending.
+type RecordingResult struct {
+	Path        string `json:"path"`
+	Bytes       int64  `json:"bytes"`
+	Interrupted bool   `json:"interrupted"`
+}
+
+type RecordingResponse struct {
+	Result *RecordingResult `json:"result,omitempty"`
+	Error  *BindingError    `json:"error,omitempty"`
 }
 
 type PreviewStatsRequest struct {
@@ -488,6 +507,43 @@ func (a *App) StopPreview(request StopPreviewRequest) ActionResponse {
 	return ActionResponse{Result: &ActionResult{Completed: true}}
 }
 
+// StartRecording records a keyframe-aligned MP4 clip of a live preview into
+// the user's movies folder.
+func (a *App) StartRecording(request RecordingRequest) RecordingResponse {
+	if !validPreviewSessionID(request.SessionID) {
+		return RecordingResponse{Error: bindingValidation("invalid_session_id", "the preview session identifier is not valid")}
+	}
+	a.mu.Lock()
+	previews := a.previews
+	a.mu.Unlock()
+	if previews == nil {
+		return RecordingResponse{Error: bindingUnavailable("app_closed", "the desktop application is closed")}
+	}
+	path, err := previews.startRecording(request.SessionID, time.Now())
+	if err != nil {
+		return RecordingResponse{Error: bindingErrorFrom(err)}
+	}
+	return RecordingResponse{Result: &RecordingResult{Path: path}}
+}
+
+// StopRecording publishes the clip being recorded for a live preview.
+func (a *App) StopRecording(request RecordingRequest) RecordingResponse {
+	if !validPreviewSessionID(request.SessionID) {
+		return RecordingResponse{Error: bindingValidation("invalid_session_id", "the preview session identifier is not valid")}
+	}
+	a.mu.Lock()
+	previews := a.previews
+	a.mu.Unlock()
+	if previews == nil {
+		return RecordingResponse{Error: bindingUnavailable("app_closed", "the desktop application is closed")}
+	}
+	result, err := previews.stopRecording(request.SessionID)
+	if err != nil {
+		return RecordingResponse{Error: bindingErrorFrom(err)}
+	}
+	return RecordingResponse{Result: result}
+}
+
 // PreviewStats returns live measurements for an active preview.
 func (a *App) PreviewStats(request PreviewStatsRequest) PreviewStatsResponse {
 	if !validPreviewSessionID(request.SessionID) {
@@ -526,6 +582,18 @@ func bindingErrorFrom(err error) *BindingError {
 	}
 	if errors.Is(err, errPreviewLimit) {
 		return &BindingError{Category: core.CategoryUsage, Code: "preview_limit", Message: "at most four previews can run at once"}
+	}
+	switch {
+	case errors.Is(err, errPreviewNotFound):
+		return &BindingError{Category: core.CategoryUsage, Code: "preview_not_found", Message: "the preview session is not active"}
+	case errors.Is(err, errRecordingActive):
+		return &BindingError{Category: core.CategoryUsage, Code: "recording_active", Message: "a recording is already running"}
+	case errors.Is(err, errRecordingInactive):
+		return &BindingError{Category: core.CategoryUsage, Code: "recording_inactive", Message: "no recording is running"}
+	case errors.Is(err, stream.ErrClipEmpty):
+		return &BindingError{Category: core.CategoryUsage, Code: "recording_empty", Message: "the recording ended before the first keyframe"}
+	case errors.Is(err, stream.ErrClipExists), errors.Is(err, stream.ErrClipWrite):
+		return &BindingError{Category: core.CategoryInternal, Code: "recording_write", Message: "the clip could not be saved"}
 	}
 	var managerErr *core.ManagerError
 	if errors.As(err, &managerErr) {

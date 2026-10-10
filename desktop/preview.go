@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"sync"
+	"time"
 
 	core "github.com/addodelgrossi/ovm/internal/app"
 	"github.com/addodelgrossi/ovm/internal/preview"
@@ -20,11 +22,16 @@ const wailsPageOrigin = "wails://wails"
 // returned release function, when non-nil, is called once the preview ends.
 type PreviewSourceFactory func(ctx context.Context, manager Manager, selection core.StreamSelection) (stream.VideoSource, func(), error)
 
-var errPreviewLimit = errors.New("preview limit reached")
+var (
+	errPreviewLimit    = errors.New("preview limit reached")
+	errPreviewNotFound = errors.New("preview session not found")
+)
 
 type previewController struct {
 	factory PreviewSourceFactory
 	origins []string
+	// clipDir locates the clip folder; tests replace it.
+	clipDir func() (string, error)
 
 	mu        sync.Mutex
 	server    *preview.Server
@@ -35,14 +42,17 @@ type previewController struct {
 }
 
 type activePreview struct {
-	cancel context.CancelFunc
-	meter  *stream.Meter
+	cancel    context.CancelFunc
+	meter     *stream.Meter
+	sink      *previewSink
+	selection core.StreamSelection
 }
 
 func newPreviewController(factory PreviewSourceFactory, origins []string) *previewController {
 	return &previewController{
 		factory:   factory,
 		origins:   origins,
+		clipDir:   clipDirectory,
 		active:    make(map[string]*activePreview),
 		snapshots: make(map[string]*preview.SnapshotSession),
 	}
@@ -97,13 +107,16 @@ func (c *previewController) start(callCtx, root context.Context, manager Manager
 		}
 		return nil, errPreviewLimit
 	}
-	c.active[session.ID()] = &activePreview{cancel: cancel, meter: meter}
+	sink := &previewSink{bridge: session}
+	c.active[session.ID()] = &activePreview{cancel: cancel, meter: meter, sink: sink, selection: selection}
 	c.wg.Add(1)
 	c.mu.Unlock()
 
 	go func() {
 		defer c.wg.Done()
-		_ = stream.PumpFMP4(ctx, metered, session)
+		_ = stream.PumpFMP4(ctx, metered, sink)
+		// A recording still running when the stream ends is published.
+		_, _, _, _ = sink.finishRecording()
 		session.Close()
 		if release != nil {
 			release()
@@ -174,6 +187,40 @@ func (c *previewController) startSnapshot(callCtx context.Context, manager Manag
 		URL:       server.BaseURL() + session.Path(),
 		Token:     server.Token(),
 	}, nil
+}
+
+// startRecording begins a keyframe-aligned clip of an active live preview.
+func (c *previewController) startRecording(sessionID string, now time.Time) (string, error) {
+	c.mu.Lock()
+	active := c.active[sessionID]
+	c.mu.Unlock()
+	if active == nil {
+		return "", errPreviewNotFound
+	}
+	directory, err := c.clipDir()
+	if err != nil {
+		return "", stream.ErrClipWrite
+	}
+	path := filepath.Join(directory, clipFileName(active.selection.ProfileToken, now))
+	if err := active.sink.startRecording(path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// stopRecording publishes the clip of an active live preview.
+func (c *previewController) stopRecording(sessionID string) (*RecordingResult, error) {
+	c.mu.Lock()
+	active := c.active[sessionID]
+	c.mu.Unlock()
+	if active == nil {
+		return nil, errPreviewNotFound
+	}
+	path, size, interrupted, err := active.sink.finishRecording()
+	if err != nil {
+		return nil, err
+	}
+	return &RecordingResult{Path: path, Bytes: size, Interrupted: interrupted}, nil
 }
 
 // stats returns the measurements of an active preview.

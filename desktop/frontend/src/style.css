@@ -1747,3 +1747,9 @@ tbody th {
   aspect-ratio: auto;
   height: calc(100vh - 9rem);
 }
+
+.live-recording {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--danger);
+}

@@ -38,7 +38,9 @@ const apiMock = vi.hoisted(() => ({
   stopPreview: vi.fn(),
   previewStats: vi.fn(),
   startSnapshotPreview: vi.fn(),
-  setFullscreen: vi.fn()
+  setFullscreen: vi.fn(),
+  startRecording: vi.fn(),
+  stopRecording: vi.fn()
 }))
 
 const liveSession = {
@@ -942,6 +944,28 @@ describe('App M3 integration', () => {
     expect(stats.textContent).toContain('118 ms')
     expect(stats.textContent).toContain('Reconnects 1')
     expect(apiMock.previewStats).toHaveBeenCalledWith(liveSession.session_id)
+
+    apiMock.startRecording.mockResolvedValue({
+      data: { path: '', bytes: 0, interrupted: false }
+    })
+    apiMock.stopRecording.mockResolvedValue({
+      data: {
+        path: '/Users/tester/Movies/ovm/ovm-profile_main.mp4',
+        bytes: 2_500_000,
+        interrupted: false
+      }
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Record clip' }))
+    expect(apiMock.startRecording).toHaveBeenCalledWith(liveSession.session_id)
+    expect(await screen.findByText('Recording…')).toBeTruthy()
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Stop recording' })
+    )
+    expect(
+      await screen.findByText(
+        'Clip saved to /Users/tester/Movies/ovm/ovm-profile_main.mp4 (2.5 MB).'
+      )
+    ).toBeTruthy()
 
     await fireEvent.click(screen.getByRole('button', { name: 'Stop preview' }))
     expect(apiMock.stopPreview).toHaveBeenCalledWith(liveSession.session_id)

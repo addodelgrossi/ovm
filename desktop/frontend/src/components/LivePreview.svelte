@@ -26,6 +26,8 @@
   let showingSnapshots = $state(false)
   let playerState = $state<PreviewState | undefined>()
   let stats = $state<PreviewStats | undefined>()
+  let recording = $state(false)
+  let recordingMessage = $state('')
   let player: LivePlayer | undefined
   let snapshotPlayer: SnapshotPlayer | undefined
   let sessionId = ''
@@ -104,6 +106,39 @@
     snapshotPlayer.start()
   }
 
+  async function startRecording(): Promise<void> {
+    if (!sessionId || recording) return
+    recordingMessage = ''
+    const response = await api.startRecording(sessionId)
+    if (response.data) {
+      recording = true
+    } else {
+      recordingMessage = t(locale, 'record.failed')
+    }
+  }
+
+  async function stopRecording(): Promise<void> {
+    if (!sessionId || !recording) return
+    recording = false
+    const response = await api.stopRecording(sessionId)
+    if (!response.data) {
+      recordingMessage = t(locale, 'record.failed')
+      return
+    }
+    const values = {
+      path: response.data.path,
+      size: number(response.data.bytes / 1_000_000)
+    }
+    recordingMessage = response.data.interrupted
+      ? t(locale, 'record.savedInterrupted', values)
+      : t(locale, 'record.saved', values)
+  }
+
+  async function stopPreview(): Promise<void> {
+    if (recording) await stopRecording()
+    stop()
+  }
+
   function stopLive(): void {
     if (statsTimer) clearInterval(statsTimer)
     statsTimer = undefined
@@ -116,6 +151,7 @@
 
   function stop(): void {
     active = false
+    recording = false
     stopLive()
     snapshotPlayer?.stop()
     snapshotPlayer = undefined
@@ -170,9 +206,31 @@
   </div>
   <div class="url-actions">
     {#if active}
-      <button type="button" class="button button-secondary" onclick={stop}
-        >{t(locale, 'live.stop')}</button
+      <button
+        type="button"
+        class="button button-secondary"
+        onclick={() => void stopPreview()}>{t(locale, 'live.stop')}</button
       >
+      {#if !showingSnapshots && (playerState?.kind === 'connecting' || playerState?.kind === 'playing')}
+        {#if recording}
+          <button
+            type="button"
+            class="button button-secondary"
+            onclick={() => void stopRecording()}
+            >{t(locale, 'record.stop')}</button
+          >
+          <span class="live-recording" role="status"
+            >{t(locale, 'record.running')}</span
+          >
+        {:else}
+          <button
+            type="button"
+            class="button button-secondary"
+            onclick={() => void startRecording()}
+            >{t(locale, 'record.start')}</button
+          >
+        {/if}
+      {/if}
     {:else}
       <button
         type="button"
@@ -218,6 +276,9 @@
           <dd>{stats.reconnects}</dd>
         </div>
       </dl>
+    {/if}
+    {#if recordingMessage}
+      <span class="live-status" role="status">{recordingMessage}</span>
     {/if}
     {#if playerState}
       <span

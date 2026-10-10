@@ -49,6 +49,10 @@ export function StartPreview(
   arg1: main.StartPreviewRequest
 ): Promise<main.StartPreviewResponse>
 
+export function StartRecording(
+  arg1: main.RecordingRequest
+): Promise<main.RecordingResponse>
+
 export function StartSnapshotPreview(
   arg1: main.StartPreviewRequest
 ): Promise<main.StartPreviewResponse>
@@ -56,6 +60,10 @@ export function StartSnapshotPreview(
 export function StopPreview(
   arg1: main.StopPreviewRequest
 ): Promise<main.ActionResponse>
+
+export function StopRecording(
+  arg1: main.RecordingRequest
+): Promise<main.RecordingResponse>
 
 export function UpdatePreferences(
   arg1: main.UpdatePreferencesRequest

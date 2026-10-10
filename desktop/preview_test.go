@@ -5,6 +5,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -206,6 +209,52 @@ func TestPreviewControllerServesSnapshotFallback(t *testing.T) {
 	}
 	closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer closeCancel()
+	if err := controller.close(closeCtx); err != nil {
+		t.Fatalf("close() error = %v", err)
+	}
+}
+
+func TestPreviewControllerRecordsKeyframeAlignedClips(t *testing.T) {
+	t.Parallel()
+	controller := newPreviewController(syntheticPreviewSources, []string{wailsPageOrigin})
+	directory := t.TempDir()
+	controller.clipDir = func() (string, error) { return directory, nil }
+	root, cancelRoot := context.WithCancel(context.Background())
+	defer cancelRoot()
+	// A profile token with path characters must not escape the clip folder.
+	unsafeProfile := core.StreamSelection{DeviceID: "device", ProfileToken: "main/../token", Transport: core.StreamTransportTCP} //nolint:gosec // synthetic ONVIF profile token, not a credential
+	result, err := controller.start(context.Background(), root, nil, unsafeProfile)
+	if err != nil {
+		t.Fatalf("start() error = %v", err)
+	}
+	if _, err := controller.stopRecording(result.SessionID); !errors.Is(err, errRecordingInactive) {
+		t.Fatalf("stopRecording() before start error = %v", err)
+	}
+	path, err := controller.startRecording(result.SessionID, time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("startRecording() error = %v", err)
+	}
+	if filepath.Dir(path) != directory || filepath.Base(path) != "ovm-maintoken-20261010-120000.000.mp4" {
+		t.Fatalf("clip path = %q", path)
+	}
+	if _, err := controller.startRecording(result.SessionID, time.Now()); !errors.Is(err, errRecordingActive) {
+		t.Fatalf("second startRecording() error = %v", err)
+	}
+	// GOP 25 at 25 fps: wait past a keyframe so the clip is not empty.
+	time.Sleep(1300 * time.Millisecond)
+	clip, err := controller.stopRecording(result.SessionID)
+	if err != nil {
+		t.Fatalf("stopRecording() error = %v", err)
+	}
+	info, err := os.Stat(clip.Path)
+	if err != nil || info.Size() != clip.Bytes || clip.Bytes == 0 || clip.Interrupted {
+		t.Fatalf("clip = %+v, stat = %v, %v", clip, info, err)
+	}
+	if _, err := controller.startRecording(strings.Repeat("0", 32), time.Now()); !errors.Is(err, errPreviewNotFound) {
+		t.Fatalf("startRecording(unknown) error = %v", err)
+	}
+	closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	if err := controller.close(closeCtx); err != nil {
 		t.Fatalf("close() error = %v", err)
 	}

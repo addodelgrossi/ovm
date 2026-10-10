@@ -77,10 +77,25 @@ type RTSPH264Source struct {
 	units  chan accessUnit
 	done   chan struct{}
 
+	lost *lossCounter
+
 	mu        sync.Mutex
 	err       error
 	dropping  bool
 	closeOnce sync.Once
+}
+
+// lossCounter is registered before the client starts so the callback never
+// races with setup.
+type lossCounter struct {
+	mu   sync.Mutex
+	lost uint64
+}
+
+func (l *lossCounter) add(lost uint64) {
+	l.mu.Lock()
+	l.lost += lost
+	l.mu.Unlock()
 }
 
 // OpenRTSPH264 connects, describes, sets up the first H.264 video track, and
@@ -109,6 +124,8 @@ func OpenRTSPH264(ctx context.Context, options RTSPOptions) (*RTSPH264Source, er
 		DialContext:  dialer.DialContext,
 		UserAgent:    "ovm",
 	}
+	loss := &lossCounter{}
+	client.OnPacketsLost = loss.add
 	if err := client.Start(); err != nil {
 		return nil, ErrRTSPNetwork
 	}
@@ -124,7 +141,7 @@ func OpenRTSPH264(ctx context.Context, options RTSPOptions) (*RTSPH264Source, er
 		}
 	}()
 
-	source, err := setupH264(client, target)
+	source, err := setupH264(client, target, loss)
 	if err != nil {
 		client.Close()
 		if ctx.Err() != nil {
@@ -135,7 +152,7 @@ func OpenRTSPH264(ctx context.Context, options RTSPOptions) (*RTSPH264Source, er
 	return source, nil
 }
 
-func setupH264(client *gortsplib.Client, target *base.URL) (*RTSPH264Source, error) {
+func setupH264(client *gortsplib.Client, target *base.URL, loss *lossCounter) (*RTSPH264Source, error) {
 	session, _, err := client.Describe(target)
 	if err != nil {
 		return nil, classifyRTSPError(err)
@@ -158,6 +175,7 @@ func setupH264(client *gortsplib.Client, target *base.URL) (*RTSPH264Source, err
 		pps:    bytes.Clone(h264Format.PPS),
 		units:  make(chan accessUnit, accessUnitQueue),
 		done:   make(chan struct{}),
+		lost:   loss,
 	}
 	client.OnPacketRTP(media, h264Format, func(packet *rtp.Packet) {
 		source.handlePacket(media, decoder, packet)
@@ -216,6 +234,13 @@ func (s *RTSPH264Source) ReadAccessUnit(ctx context.Context) ([][]byte, time.Dur
 		defer s.mu.Unlock()
 		return nil, 0, s.err
 	}
+}
+
+// LostPackets reports RTP packets the client detected as lost.
+func (s *RTSPH264Source) LostPackets() uint64 {
+	s.lost.mu.Lock()
+	defer s.lost.mu.Unlock()
+	return s.lost.lost
 }
 
 // Close ends the session. It is idempotent.

@@ -11,7 +11,7 @@ import (
 )
 
 func sampleMedia1Encoder() media.VideoEncoderConfiguration {
-	return media.VideoEncoderConfiguration{
+	return media.VideoEncoderConfiguration{ //nolint:gosec // synthetic ONVIF configuration token, not a credential
 		Token: "venc_main", Name: "main", UseCount: 1, Encoding: media.VideoEncodingH264,
 		Resolution: media.VideoResolution{Width: 1280, Height: 720}, HasResolution: true,
 		Quality: 5, HasQuality: true,

@@ -244,13 +244,13 @@ func waitForViewers(t *testing.T, session *Session, want int) {
 func TestSnapshotSessionServesFreshImagesWithTheSameProtections(t *testing.T) {
 	t.Parallel()
 	server := newTestServer(t)
-	calls := 0
+	var calls byte
 	snapshot, err := server.NewSnapshotSession(func(context.Context) ([]byte, error) {
 		calls++
 		if calls == 3 {
 			return nil, errors.New("camera unavailable")
 		}
-		return []byte{0xFF, 0xD8, byte(calls), 0xFF, 0xD9}, nil
+		return []byte{0xFF, 0xD8, calls, 0xFF, 0xD9}, nil
 	})
 	if err != nil {
 		t.Fatalf("NewSnapshotSession() error = %v", err)

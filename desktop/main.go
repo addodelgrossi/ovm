@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log"
+	"os"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -14,9 +16,21 @@ import (
 var assets embed.FS
 
 func main() {
-	app := NewApp()
+	desktopConfig, err := parseDesktopOptions(os.Args[1:])
+	if err != nil {
+		log.Print("desktop application arguments are invalid")
+		return
+	}
+	app, err := composeDesktop(context.Background(), desktopConfig, productionCompositionFactories())
+	if err != nil {
+		// Composition errors may wrap platform diagnostics. Keep the startup log
+		// generic so no backend value can cross into a user-visible log.
+		log.Print("desktop application could not be composed")
+		return
+	}
+	defer app.shutdown(context.Background())
 
-	err := wails.Run(&options.App{
+	err = wails.Run(&options.App{
 		Title:                    "ovm",
 		Width:                    1280,
 		Height:                   800,
@@ -42,6 +56,6 @@ func main() {
 		Bind: []interface{}{app},
 	})
 	if err != nil {
-		log.Printf("desktop application failed: %v", err)
+		log.Print("desktop application failed")
 	}
 }

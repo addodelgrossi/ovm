@@ -76,6 +76,7 @@ build-cli:
 
 build-desktop: frontend-build
 	cd desktop && $(DESKTOP_ENV) $(GO) run github.com/wailsapp/wails/v2/cmd/wails@$(WAILS_VERSION) build -clean
+	cd $(FRONTEND_DIR) && npx prettier --write --ignore-path /dev/null "wailsjs/go/**/*.{ts,js}"
 
 ci: format-check lint actionlint vet test test-race frontend-check frontend-test frontend-build build-cli build-desktop
 

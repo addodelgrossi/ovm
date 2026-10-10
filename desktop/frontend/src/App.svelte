@@ -1,137 +1,340 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { BuildInfo } from '../wailsjs/go/main/App.js'
+  import AuthDialog from './components/AuthDialog.svelte'
+  import ConfirmForgetDialog from './components/ConfirmForgetDialog.svelte'
+  import ManualDeviceDialog from './components/ManualDeviceDialog.svelte'
+  import OverviewView from './components/OverviewView.svelte'
+  import Sidebar from './components/Sidebar.svelte'
+  import StreamsView from './components/StreamsView.svelte'
+  import ToastRegion from './components/ToastRegion.svelte'
+  import type { AuthenticateInput, Locale, Tab, Theme } from './lib/api'
+  import { errorMessage, t } from './lib/i18n'
+  import { createAppState } from './lib/state.svelte'
 
-  type VersionInfo = {
-    version: string
-    commit: string
-    date: string
-  }
+  const model = createAppState()
+  let manualDialogOpen = $state(false)
+  let authDialogOpen = $state(false)
+  let forgetDialogOpen = $state(false)
 
-  let versionInfo: VersionInfo = {
-    version: 'dev',
-    commit: 'unknown',
-    date: 'unknown'
-  }
-
-  onMount(async () => {
-    try {
-      versionInfo = await BuildInfo()
-    } catch {
-      // Standalone browser development does not expose Wails bindings.
-    }
+  onMount(() => {
+    void model.bootstrap()
+    return () => model.dispose()
   })
+
+  function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false
+    return (
+      target.isContentEditable ||
+      Boolean(
+        target.closest('input, textarea, select, [contenteditable="true"]')
+      )
+    )
+  }
+
+  function keyboardShortcut(event: KeyboardEvent): void {
+    if (
+      !(event.metaKey || event.ctrlKey) ||
+      event.altKey ||
+      isEditableTarget(event.target) ||
+      manualDialogOpen ||
+      authDialogOpen ||
+      forgetDialogOpen
+    ) {
+      return
+    }
+
+    const key = event.key.toLowerCase()
+    if (key === 'r') {
+      event.preventDefault()
+      void model.refresh()
+      return
+    }
+    if (key === '1' && model.selectedDevice) {
+      event.preventDefault()
+      void model.activateTab('overview')
+      return
+    }
+    if (key === '2' && model.selectedDevice) {
+      event.preventDefault()
+      void model.activateTab('streams')
+    }
+  }
+
+  function activateTab(tab: Tab): void {
+    void model.activateTab(tab)
+  }
+
+  function updateLocale(event: Event): void {
+    void model.updateLocale(
+      (event.currentTarget as HTMLSelectElement).value as Locale
+    )
+  }
+
+  function updateTheme(event: Event): void {
+    void model.updateTheme(
+      (event.currentTarget as HTMLSelectElement).value as Theme
+    )
+  }
+
+  async function addManualDevice(
+    endpoint: string,
+    displayName: string
+  ): Promise<boolean> {
+    return model.addManualDevice(endpoint, displayName)
+  }
+
+  async function authenticate(input: AuthenticateInput): Promise<boolean> {
+    return model.authenticate(input)
+  }
+
+  async function forgetSelected(): Promise<boolean> {
+    const selected = model.selectedDevice
+    return selected ? model.forgetDevice(selected.id) : false
+  }
 </script>
 
 <svelte:head>
-  <title>ovm — ONVIF-compatible device manager</title>
+  <title>{t(model.locale, 'app.documentTitle')}</title>
 </svelte:head>
 
-<div class="app-shell">
-  <aside class="sidebar" aria-label="Devices">
-    <div class="titlebar-drag-region" aria-hidden="true"></div>
+<svelte:window onkeydown={keyboardShortcut} />
 
-    <div class="brand-row">
-      <div class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 32 32" role="img">
-          <rect x="5" y="9" width="19" height="14" rx="4"></rect>
-          <circle cx="14.5" cy="16" r="4"></circle>
-          <path d="m24 13 4-2v10l-4-2z"></path>
-          <path d="M9 6h11"></path>
-        </svg>
-      </div>
-      <div>
-        <p class="eyebrow">Device manager</p>
-        <h1>ovm</h1>
-      </div>
-    </div>
-
-    <div class="toolbar">
-      <button
-        type="button"
-        class="primary-button"
-        disabled
-        title="Available in milestone M1"
-      >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="M10 4v12M4 10h12"></path>
-        </svg>
-        Scan network
-      </button>
-    </div>
-
-    <div class="device-list-empty">
-      <span class="status-ring" aria-hidden="true"></span>
-      <p>No devices yet</p>
-      <small>Discovery and manual setup arrive in the next milestone.</small>
-    </div>
-
-    <footer>
-      <span>Version {versionInfo.version}</span>
-      <span class="status-dot" aria-label="Foundation status: ready"></span>
-    </footer>
-  </aside>
-
-  <main class="content">
-    <header class="content-header">
-      <div>
-        <p class="eyebrow">Welcome</p>
-        <h2>Connect your first camera</h2>
-      </div>
-      <span class="milestone-badge">Foundation</span>
-    </header>
-
-    <section class="welcome-card" aria-labelledby="getting-started-title">
-      <div class="network-illustration" aria-hidden="true">
-        <div class="camera-node">
-          <svg viewBox="0 0 48 48">
-            <rect x="7" y="13" width="27" height="22" rx="7"></rect>
-            <circle cx="20" cy="24" r="7"></circle>
-            <path d="m34 19 8-4v18l-8-4z"></path>
-          </svg>
-        </div>
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-
-      <div class="welcome-copy">
-        <p class="eyebrow">Getting started</p>
-        <h3 id="getting-started-title">
-          Local camera setup, without guesswork
-        </h3>
-        <p>
-          ovm will discover ONVIF-compatible cameras, surface safe stream URLs,
-          and make configuration changes verifiable.
-        </p>
-
-        <ol>
-          <li><span>1</span>Connect the Mac to the camera network.</li>
-          <li>
-            <span>2</span>Choose the wired interface and allow Local Network
-            access.
-          </li>
-          <li><span>3</span>Scan or add the device endpoint manually.</li>
-        </ol>
-      </div>
-    </section>
-
-    <section class="principles-grid" aria-label="Project principles">
-      <article>
-        <span class="article-icon" aria-hidden="true">⌁</span>
-        <h3>Local by design</h3>
-        <p>No telemetry and no cloud dependency.</p>
-      </article>
-      <article>
-        <span class="article-icon" aria-hidden="true">◇</span>
-        <h3>Credentials protected</h3>
-        <p>Passwords stay in the native OS secret store.</p>
-      </article>
-      <article>
-        <span class="article-icon" aria-hidden="true">✓</span>
-        <h3>Changes verified</h3>
-        <p>Every supported mutation is read back.</p>
-      </article>
-    </section>
+{#if model.phase === 'loading'}
+  <main class="startup-state" aria-busy="true">
+    <div class="startup-mark" aria-hidden="true">◎</div>
+    <h1>{t(model.locale, 'app.loading')}</h1>
+    <p>{t(model.locale, 'app.loadingDetail')}</p>
+    <span class="spinner spinner-large" aria-hidden="true"></span>
   </main>
-</div>
+{:else if model.phase === 'error'}
+  <main class="startup-state">
+    <div class="startup-mark startup-mark-error" aria-hidden="true">!</div>
+    <h1>{t(model.locale, 'app.errorTitle')}</h1>
+    <p>{t(model.locale, 'app.errorDetail')}</p>
+    {#if model.globalError}
+      <p class="error-detail" role="alert">
+        {errorMessage(model.locale, model.globalError)}
+      </p>
+    {/if}
+    <button
+      type="button"
+      class="button button-primary"
+      onclick={() => void model.bootstrap()}
+    >
+      {t(model.locale, 'action.retry')}
+    </button>
+  </main>
+{:else}
+  <div class="app-shell">
+    <Sidebar
+      {model}
+      onManualAdd={() => (manualDialogOpen = true)}
+      onAuthenticate={() => (authDialogOpen = true)}
+      onForget={() => (forgetDialogOpen = true)}
+    />
+
+    <main class="content" aria-busy={model.refreshing}>
+      <div class="content-inner">
+        <header class="content-header">
+          <div class="selected-heading">
+            <p class="eyebrow">
+              {model.selectedDevice
+                ? t(model.locale, 'header.endpoint')
+                : t(model.locale, 'app.product')}
+            </p>
+            <h2>
+              {model.selectedDevice?.display_name?.trim() ||
+                model.selectedDevice?.endpoint ||
+                t(model.locale, 'app.product')}
+            </h2>
+            {#if model.selectedDevice?.display_name}
+              <p class="endpoint-subtitle">{model.selectedDevice.endpoint}</p>
+            {/if}
+          </div>
+
+          <div class="header-actions">
+            {#if model.capabilities.demo}
+              <span class="badge badge-demo"
+                >{t(model.locale, 'demo.badge')}</span
+              >
+            {/if}
+            <button
+              type="button"
+              class="icon-button header-refresh"
+              aria-label={t(model.locale, 'header.refreshShortcut')}
+              aria-keyshortcuts="Meta+R Control+R"
+              disabled={model.refreshing}
+              onclick={() => void model.refresh()}
+            >
+              <span aria-hidden="true">↻</span>
+            </button>
+            <div class="preference-control">
+              <label for="app-language"
+                >{t(model.locale, 'preferences.language')}</label
+              >
+              <select
+                id="app-language"
+                value={model.locale}
+                onchange={updateLocale}
+              >
+                <option value="en">English</option>
+                <option value="pt-BR">Português (Brasil)</option>
+              </select>
+            </div>
+            <div class="preference-control">
+              <label for="app-theme"
+                >{t(model.locale, 'preferences.theme')}</label
+              >
+              <select id="app-theme" value={model.theme} onchange={updateTheme}>
+                <option value="system"
+                  >{t(model.locale, 'preferences.theme.system')}</option
+                >
+                <option value="light"
+                  >{t(model.locale, 'preferences.theme.light')}</option
+                >
+                <option value="dark"
+                  >{t(model.locale, 'preferences.theme.dark')}</option
+                >
+              </select>
+            </div>
+          </div>
+        </header>
+
+        {#if model.globalError}
+          <div class="notice notice-warning" role="alert">
+            {errorMessage(model.locale, model.globalError)}
+          </div>
+        {/if}
+
+        {#if model.capabilities.demo}
+          <div class="demo-disclosure" role="note">
+            {t(model.locale, 'demo.claim')}
+          </div>
+        {/if}
+
+        {#if model.selectedDevice}
+          <nav class="tabs" aria-label={t(model.locale, 'tabs.label')}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={model.activeTab === 'overview'}
+              aria-controls="overview-panel"
+              aria-keyshortcuts="Meta+1 Control+1"
+              class:active={model.activeTab === 'overview'}
+              onclick={() => activateTab('overview')}
+            >
+              {t(model.locale, 'tabs.overviewShortcut')}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={model.activeTab === 'streams'}
+              aria-controls="streams-panel"
+              aria-keyshortcuts="Meta+2 Control+2"
+              class:active={model.activeTab === 'streams'}
+              onclick={() => activateTab('streams')}
+            >
+              {t(model.locale, 'tabs.streamsShortcut')}
+            </button>
+          </nav>
+
+          {#if model.activeTab === 'overview'}
+            <div id="overview-panel" role="tabpanel">
+              <OverviewView
+                state={model}
+                device={model.selectedDevice}
+                onAuthenticate={() => (authDialogOpen = true)}
+              />
+            </div>
+          {:else}
+            <div id="streams-panel" role="tabpanel">
+              <StreamsView {model} device={model.selectedDevice} />
+            </div>
+          {/if}
+        {:else}
+          <section class="welcome" aria-labelledby="welcome-title">
+            <div class="welcome-visual" aria-hidden="true">
+              <div class="camera-glyph">◉</div>
+              <span></span><span></span><span></span>
+            </div>
+            <div>
+              <p class="eyebrow">
+                {t(model.locale, 'main.noSelectionEyebrow')}
+              </p>
+              <h2 id="welcome-title">
+                {t(model.locale, 'main.noSelectionTitle')}
+              </h2>
+              <p class="welcome-lead">
+                {t(model.locale, 'main.noSelectionBody')}
+              </p>
+              <ol class="steps">
+                <li><span>1</span>{t(model.locale, 'main.stepOne')}</li>
+                <li><span>2</span>{t(model.locale, 'main.stepTwo')}</li>
+                <li><span>3</span>{t(model.locale, 'main.stepThree')}</li>
+              </ol>
+              <button
+                type="button"
+                class="button button-primary"
+                onclick={() => (manualDialogOpen = true)}
+              >
+                {t(model.locale, 'sidebar.manualAdd')}
+              </button>
+            </div>
+          </section>
+
+          <section
+            class="principle-grid"
+            aria-label={t(model.locale, 'app.product')}
+          >
+            <article>
+              <span aria-hidden="true">⌁</span>
+              <h3>{t(model.locale, 'main.localTitle')}</h3>
+              <p>{t(model.locale, 'main.localBody')}</p>
+            </article>
+            <article>
+              <span aria-hidden="true">◇</span>
+              <h3>{t(model.locale, 'main.secretTitle')}</h3>
+              <p>{t(model.locale, 'main.secretBody')}</p>
+            </article>
+            <article>
+              <span aria-hidden="true">✓</span>
+              <h3>{t(model.locale, 'main.safeTitle')}</h3>
+              <p>{t(model.locale, 'main.safeBody')}</p>
+            </article>
+          </section>
+        {/if}
+      </div>
+    </main>
+  </div>
+
+  <ToastRegion state={model} />
+
+  {#if manualDialogOpen}
+    <ManualDeviceDialog
+      locale={model.locale}
+      busy={model.addingManual}
+      onSubmit={addManualDevice}
+      onClose={() => (manualDialogOpen = false)}
+    />
+  {/if}
+
+  {#if authDialogOpen && model.selectedDevice}
+    <AuthDialog
+      device={model.selectedDevice}
+      locale={model.locale}
+      busy={model.authenticatingDeviceId === model.selectedDevice.id}
+      onSubmit={authenticate}
+      onClose={() => (authDialogOpen = false)}
+    />
+  {/if}
+
+  {#if forgetDialogOpen && model.selectedDevice}
+    <ConfirmForgetDialog
+      device={model.selectedDevice}
+      locale={model.locale}
+      busy={model.forgettingDeviceId === model.selectedDevice.id}
+      onConfirm={forgetSelected}
+      onClose={() => (forgetDialogOpen = false)}
+    />
+  {/if}
+{/if}

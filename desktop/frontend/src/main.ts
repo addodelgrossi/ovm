@@ -1,6 +1,9 @@
 import './style.css'
 import { mount } from 'svelte'
 import App from './App.svelte'
+import { applyStoredTheme } from './lib/theme'
+
+applyStoredTheme()
 
 const target = document.getElementById('app')
 if (!target) {

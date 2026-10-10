@@ -1,8 +1,19 @@
 # Third-Party Notices
 
-This file will list runtime dependencies included in distributed `ovm`
-artifacts, their versions, copyright notices, and licenses.
+The following runtime dependency is introduced by the native secret-provider
+adapters in this M3 slice. The complete artifact-specific dependency inventory
+is generated from the locked module graph and reviewed before release.
 
-The authoritative list is generated from locked Go and frontend dependencies
-and then reviewed before each release. Build-only tools that are not distributed
-are documented separately by the release workflow.
+## github.com/zalando/go-keyring
+
+- Version: v0.2.8
+- Copyright: Copyright (c) 2016 Zalando SE
+- License: MIT
+- Source: https://github.com/zalando/go-keyring/tree/v0.2.8
+- Use: macOS Keychain and Linux Secret Service access
+
+The dependency's MIT license text is available at:
+https://github.com/zalando/go-keyring/blob/v0.2.8/LICENSE
+
+Build-only tools that are not distributed are documented separately by the
+release workflow.

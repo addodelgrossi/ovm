@@ -261,96 +261,94 @@
               {t(model.locale, 'streams.safeUrlNotice')}
             </p>
 
+            <div class="url-row">
+              <div>
+                <strong>{t(model.locale, 'streams.tcp')}</strong>
+                <code
+                  >{profile.stream?.tcp_uri ||
+                    t(model.locale, 'streams.urlUnavailable')}</code
+                >
+              </div>
+              <div class="url-actions">
+                {#if profile.stream?.tcp_uri}
+                  <CopyButton
+                    locale={model.locale}
+                    url={profile.stream.tcp_uri}
+                    kind={t(model.locale, 'streams.tcp')}
+                    profileName={profileName(profile)}
+                  />
+                  {#if model.capabilities.vlc_available && model.capabilities.rtsp_playback_available && operationSupported(profile, 'stream_tcp')}
+                    <button
+                      type="button"
+                      class="button button-secondary"
+                      onclick={() => openVLC(profile, 'tcp')}
+                      >{t(model.locale, 'action.openVlc')}</button
+                    >
+                  {/if}
+                {/if}
+              </div>
+            </div>
+
+            <div class="url-row">
+              <div>
+                <strong>{t(model.locale, 'streams.udp')}</strong>
+                <code
+                  >{profile.stream?.udp_uri ||
+                    t(model.locale, 'streams.urlUnavailable')}</code
+                >
+              </div>
+              <div class="url-actions">
+                {#if profile.stream?.udp_uri}
+                  <CopyButton
+                    locale={model.locale}
+                    url={profile.stream.udp_uri}
+                    kind={t(model.locale, 'streams.udp')}
+                    profileName={profileName(profile)}
+                  />
+                  {#if model.capabilities.vlc_available && model.capabilities.rtsp_playback_available && operationSupported(profile, 'stream_udp')}
+                    <button
+                      type="button"
+                      class="button button-secondary"
+                      onclick={() => openVLC(profile, 'udp')}
+                      >{t(model.locale, 'action.openVlc')}</button
+                    >
+                  {/if}
+                {/if}
+              </div>
+            </div>
+
+            <div class="url-row">
+              <div>
+                <strong>{t(model.locale, 'streams.snapshot')}</strong>
+                <code
+                  >{profile.snapshot?.uri ||
+                    t(model.locale, 'streams.urlUnavailable')}</code
+                >
+              </div>
+              <div class="url-actions">
+                {#if profile.snapshot?.uri}
+                  <CopyButton
+                    locale={model.locale}
+                    url={profile.snapshot.uri}
+                    kind={t(model.locale, 'streams.snapshot')}
+                    profileName={profileName(profile)}
+                  />
+                {/if}
+              </div>
+            </div>
+
             {#if model.capabilities.demo}
               <div class="notice notice-demo">
                 {t(model.locale, 'streams.vlcDemo')}
               </div>
-            {:else}
-              <div class="url-row">
-                <div>
-                  <strong>{t(model.locale, 'streams.tcp')}</strong>
-                  <code
-                    >{profile.stream?.tcp_uri ||
-                      t(model.locale, 'streams.urlUnavailable')}</code
-                  >
-                </div>
-                <div class="url-actions">
-                  {#if profile.stream?.tcp_uri}
-                    <CopyButton
-                      locale={model.locale}
-                      url={profile.stream.tcp_uri}
-                      kind={t(model.locale, 'streams.tcp')}
-                      profileName={profileName(profile)}
-                    />
-                    {#if model.capabilities.vlc_available && model.capabilities.rtsp_playback_available && operationSupported(profile, 'stream_tcp')}
-                      <button
-                        type="button"
-                        class="button button-secondary"
-                        onclick={() => openVLC(profile, 'tcp')}
-                        >{t(model.locale, 'action.openVlc')}</button
-                      >
-                    {/if}
-                  {/if}
-                </div>
-              </div>
-
-              <div class="url-row">
-                <div>
-                  <strong>{t(model.locale, 'streams.udp')}</strong>
-                  <code
-                    >{profile.stream?.udp_uri ||
-                      t(model.locale, 'streams.urlUnavailable')}</code
-                  >
-                </div>
-                <div class="url-actions">
-                  {#if profile.stream?.udp_uri}
-                    <CopyButton
-                      locale={model.locale}
-                      url={profile.stream.udp_uri}
-                      kind={t(model.locale, 'streams.udp')}
-                      profileName={profileName(profile)}
-                    />
-                    {#if model.capabilities.vlc_available && model.capabilities.rtsp_playback_available && operationSupported(profile, 'stream_udp')}
-                      <button
-                        type="button"
-                        class="button button-secondary"
-                        onclick={() => openVLC(profile, 'udp')}
-                        >{t(model.locale, 'action.openVlc')}</button
-                      >
-                    {/if}
-                  {/if}
-                </div>
-              </div>
-
-              <div class="url-row">
-                <div>
-                  <strong>{t(model.locale, 'streams.snapshot')}</strong>
-                  <code
-                    >{profile.snapshot?.uri ||
-                      t(model.locale, 'streams.urlUnavailable')}</code
-                  >
-                </div>
-                <div class="url-actions">
-                  {#if profile.snapshot?.uri}
-                    <CopyButton
-                      locale={model.locale}
-                      url={profile.snapshot.uri}
-                      kind={t(model.locale, 'streams.snapshot')}
-                      profileName={profileName(profile)}
-                    />
-                  {/if}
-                </div>
-              </div>
-
-              {#if !model.capabilities.rtsp_playback_available}
-                <p class="notice">
-                  {t(model.locale, 'streams.playbackUnavailable')}
-                </p>
-              {:else if !model.capabilities.vlc_available}
-                <p class="notice">
-                  {t(model.locale, 'streams.vlcUnavailable')}
-                </p>
-              {/if}
+            {:else if !model.capabilities.rtsp_playback_available}
+              <p class="notice">
+                {t(model.locale, 'streams.playbackUnavailable')}
+              </p>
+            {:else if !model.capabilities.vlc_available}
+              <p class="notice">
+                {t(model.locale, 'streams.vlcUnavailable')}
+              </p>
             {/if}
           </section>
         </article>

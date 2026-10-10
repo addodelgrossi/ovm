@@ -817,7 +817,7 @@ describe('App M3 integration', () => {
     expect(screen.getByRole('button', { name: 'Scan network' })).toBeTruthy()
   })
 
-  it('labels demo data and never presents synthetic RTSP URLs as playable', async () => {
+  it('labels demo data and offers synthetic RTSP URLs for copy but never as playable', async () => {
     apiMock.bootstrap.mockResolvedValue({
       data: makeBootstrap(makeOverview(), {
         demo: true,
@@ -836,7 +836,12 @@ describe('App M3 integration', () => {
 
     await fireEvent.click(screen.getByRole('tab', { name: /Streams/ }))
     await screen.findByRole('heading', { name: 'Profile Main stream' })
-    expect(screen.queryByText('rtsp://192.0.2.10/main-tcp')).toBeNull()
+    expect(screen.getByText('rtsp://192.0.2.10/main-tcp')).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: 'Copy RTSP over TCP URL for Main stream'
+      })
+    ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Open in VLC' })).toBeNull()
     expect(
       screen.getAllByText(

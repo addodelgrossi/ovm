@@ -50,8 +50,8 @@ type Media2EncoderOptionData struct {
 func init() {
 	media1Operations["SetVideoEncoderConfiguration"] = ActionMedia1SetVideoEncoderConfiguration
 	media2Operations["SetVideoEncoderConfiguration"] = ActionMedia2SetVideoEncoderConfiguration
-	mutationHandlers[ActionMedia1SetVideoEncoderConfiguration] = (*Device).setMedia1Encoder
-	mutationHandlers[ActionMedia2SetVideoEncoderConfiguration] = (*Device).setMedia2Encoder
+	extraHandlers[ActionMedia1SetVideoEncoderConfiguration] = (*Device).setMedia1Encoder
+	extraHandlers[ActionMedia2SetVideoEncoderConfiguration] = (*Device).setMedia2Encoder
 }
 
 var configModifyFault = FaultSpec{Kind: FaultInvalidArgVal, Reason: "ConfigModify: the configuration values are not supported"}

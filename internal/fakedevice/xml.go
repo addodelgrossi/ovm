@@ -104,6 +104,10 @@ var deviceOperations = map[string]string{
 	"GetNetworkInterfaces": ActionGetNetworkInterfaces,
 }
 
+// extraOperations maps additional service namespaces to their operation
+// local names and actions; files modeling those services register in init.
+var extraOperations = map[string]map[string]string{}
+
 // syntheticOperations maps project-authored synthetic operation local names to
 // their action URIs, validated against the synthetic namespace.
 var syntheticOperations = map[string]string{
@@ -199,6 +203,10 @@ func operationAction(operation operationWire) (string, error) {
 		}
 	case media2Namespace:
 		if action, ok := media2Operations[local]; ok {
+			return action, nil
+		}
+	default:
+		if action, ok := extraOperations[space][local]; ok {
 			return action, nil
 		}
 	}

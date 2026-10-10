@@ -143,6 +143,10 @@ type Config struct {
 	// value is filled with defaults.
 	MediaInventory MediaInventory
 
+	// Imaging supplies synthetic Imaging ver20 settings. A zero value is
+	// filled with one AUTO video source.
+	Imaging ImagingInventory
+
 	// JPEGSnapshot is the exact synthetic JPEG served by the authenticated GET
 	// snapshot endpoint. When empty, a project-owned synthetic default is used.
 	// It must be project-authored bytes, never a captured image.
@@ -254,6 +258,7 @@ func normalizeConfig(config Config) (normalizedConfig, error) {
 	if err := validateInventoryXSIntFields(config.Inventory); err != nil {
 		return normalizedConfig{}, err
 	}
+	config.Imaging = config.Imaging.withDefaults()
 	config.MediaInventory = config.MediaInventory.withDefaults()
 	if err := validateMediaInventory(config.MediaInventory); err != nil {
 		return normalizedConfig{}, err

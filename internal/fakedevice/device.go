@@ -207,7 +207,7 @@ func (d *Device) dispatch(response http.ResponseWriter, request *http.Request, v
 		d.SetState(stateRequest.Key, stateRequest.Value)
 		d.writeSuccess(response, version, buildSetState(*d.cfg()))
 	default:
-		if handler, ok := mutationHandlers[action]; ok {
+		if handler, ok := extraHandlers[action]; ok {
 			handler(d, response, version, operation)
 			return
 		}
@@ -215,12 +215,13 @@ func (d *Device) dispatch(response http.ResponseWriter, request *http.Request, v
 	}
 }
 
-// mutationHandler applies a modeled Set* operation and writes its response.
-type mutationHandler func(d *Device, response http.ResponseWriter, version SOAPVersion, operation operationWire)
+// extraHandler serves a modeled operation implemented outside dispatch, such
+// as a Set* mutation or a service registered by its own file.
+type extraHandler func(d *Device, response http.ResponseWriter, version SOAPVersion, operation operationWire)
 
-// mutationHandlers maps mutating actions to handlers; each file that models
-// mutations registers its own in init.
-var mutationHandlers = map[string]mutationHandler{}
+// extraHandlers maps actions to handlers; each file that models operations
+// outside dispatch registers its own in init.
+var extraHandlers = map[string]extraHandler{}
 
 // mutate publishes a modified copy of the configuration. Mutations are
 // serialized so concurrent Set* requests never lose an update.

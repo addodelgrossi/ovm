@@ -36,6 +36,8 @@ type productionMedia struct {
 	// httpClient is the base HTTP client. A nil value uses a fresh default
 	// client per request.
 	httpClient *http.Client
+	// readbackPolicy overrides the configuration read-back schedule in tests.
+	readbackPolicy *readbackPolicy
 }
 
 // NewProductionMediaProfiles returns the production MediaProfilesUseCase.

@@ -1888,3 +1888,21 @@ tbody th {
   font-size: 0.78rem;
   white-space: pre-wrap;
 }
+
+/* Radios and checkboxes keep their native size; the generic text-input rules
+   above would otherwise stretch and hide them. */
+.segmented input[type='radio'],
+.checkbox-field input[type='checkbox'] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.segmented label,
+.checkbox-field {
+  cursor: pointer;
+}

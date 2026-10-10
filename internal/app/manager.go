@@ -54,6 +54,8 @@ type Manager struct {
 	discovery  DiscoveryUseCase
 	inventory  InventoryUseCase
 	media      MediaProfilesUseCase
+	// liveStreams is optional; without it OpenLiveStream reports unavailable.
+	liveStreams LiveStreamOpener
 
 	mu sync.Mutex
 	// activeScan is the single in-flight scan's tracked cancel, if any.
@@ -83,6 +85,8 @@ type ManagerDependencies struct {
 	Inventory InventoryUseCase
 	// Media retrieves normalized media profiles.
 	Media MediaProfilesUseCase
+	// LiveStreams opens live RTSP streams. It is optional.
+	LiveStreams LiveStreamOpener
 }
 
 // NewManager constructs a Manager from fully injected dependencies. It returns
@@ -94,13 +98,14 @@ func NewManager(deps ManagerDependencies) (*Manager, error) {
 		return nil, newManagerError(CategoryInternal, "the device manager is not fully configured", nil)
 	}
 	return &Manager{
-		repository: deps.Repository,
-		hostIfaces: deps.HostInterfaces,
-		discovery:  deps.Discovery,
-		inventory:  deps.Inventory,
-		media:      deps.Media,
-		deviceOps:  make(map[string]*trackedCancel),
-		statuses:   make(map[string]DeviceRuntimeStatus),
+		repository:  deps.Repository,
+		hostIfaces:  deps.HostInterfaces,
+		discovery:   deps.Discovery,
+		inventory:   deps.Inventory,
+		media:       deps.Media,
+		liveStreams: deps.LiveStreams,
+		deviceOps:   make(map[string]*trackedCancel),
+		statuses:    make(map[string]DeviceRuntimeStatus),
 	}, nil
 }
 

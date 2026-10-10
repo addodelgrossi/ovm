@@ -19,6 +19,10 @@ type Dependencies struct {
 	Discovery app.DiscoveryUseCase
 	// Inventory retrieves device inventories. Required for the info command.
 	Inventory app.InventoryUseCase
+	// MediaProfiles retrieves normalized profile data. Required for profiles.
+	MediaProfiles app.MediaProfilesUseCase
+	// Snapshot retrieves one JPEG atomically. Required for snapshot.
+	Snapshot app.SnapshotUseCase
 	// LookupEnv resolves environment variables for credential input. A nil
 	// value defaults to os.LookupEnv.
 	LookupEnv func(name string) (string, bool)
@@ -28,9 +32,11 @@ type Dependencies struct {
 // adapters and the process environment.
 func Default() Dependencies {
 	return Dependencies{
-		Discovery: app.NewProductionDiscovery(),
-		Inventory: app.NewProductionInventory(),
-		LookupEnv: nil,
+		Discovery:     app.NewProductionDiscovery(),
+		Inventory:     app.NewProductionInventory(),
+		MediaProfiles: app.NewProductionMediaProfiles(),
+		Snapshot:      app.NewProductionSnapshot(),
+		LookupEnv:     nil,
 	}
 }
 
@@ -62,14 +68,16 @@ func NewRootCommand(info buildinfo.Info, deps Dependencies, rawArgs ...[]string)
 
 	// A flag-parsing failure is a usage error. Tagging it here (and inheriting
 	// to subcommands) lets ExitCodeForError map it to the usage exit code.
-	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
-		return markUsageError(err)
+	root.SetFlagErrorFunc(func(_ *cobra.Command, _ error) error {
+		return markUsageError(fmt.Errorf("the command flags are not valid"))
 	})
 
 	root.SetOut(io.Discard)
 	root.AddCommand(newVersionCommand(info))
 	root.AddCommand(newDiscoverCommand(deps.Discovery, detectJSONIntent(arguments, "discover", "--iface", "--timeout")))
 	root.AddCommand(newInfoCommand(deps.Inventory, deps.LookupEnv, detectJSONIntent(arguments, "info", "--user", "-u", "--password-env", "--timeout")))
+	root.AddCommand(newProfilesCommand(deps.MediaProfiles, deps.LookupEnv, detectJSONIntent(arguments, "profiles", "--user", "-u", "--password-env", "--timeout")))
+	root.AddCommand(newSnapshotCommand(deps.Snapshot, deps.LookupEnv, detectJSONIntent(arguments, "snapshot", "--user", "-u", "--password-env", "--profile", "--output", "-o", "--timeout")))
 	return root
 }
 

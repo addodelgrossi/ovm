@@ -71,8 +71,8 @@ func newDiscoverCommand(discovery app.DiscoveryUseCase, intent jsonIntent) *cobr
 	cmd.Flags().StringVar(&iface, "iface", "", "network interface name to probe (default: all usable interfaces)")
 	cmd.Flags().DurationVar(&timeout, "timeout", defaultDiscoverTimeout, "discovery round timeout")
 	cmd.Flags().BoolVar(&outputJSON, "json", false, "write machine-readable JSON to stdout")
-	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		marked := markUsageError(err)
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, _ error) error {
+		marked := markUsageError(fmt.Errorf("the discovery flags are not valid"))
 		if wantsJSON() {
 			usageErr := app.NewError(app.CategoryUsage, "the discovery flags are not valid")
 			if writeErr := writeDiscoveryFailureJSON(cmd.OutOrStdout(), cmd.ErrOrStderr(), app.DiscoveryResult{Devices: []app.DiscoveredDevice{}}, usageErr); writeErr != nil {

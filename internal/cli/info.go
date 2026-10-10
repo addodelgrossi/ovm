@@ -160,8 +160,8 @@ func newInfoCommand(inventory app.InventoryUseCase, lookup lookupEnv, intent jso
 	cmd.Flags().BoolVar(&allowLegacyDigest, "allow-legacy-digest", false, "permit legacy no-qop (RFC 2069) Digest authentication (opt-in; requires credentials)")
 	cmd.Flags().DurationVar(&timeout, "timeout", defaultInfoTimeout, "overall operation timeout")
 	cmd.Flags().BoolVar(&outputJSON, "json", false, "write machine-readable JSON")
-	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		marked := markUsageError(err)
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, _ error) error {
+		marked := markUsageError(fmt.Errorf("the inventory flags are not valid"))
 		if wantsJSON() {
 			usageErr := app.NewError(app.CategoryUsage, "the inventory flags are not valid")
 			if writeErr := writeInventoryFailureJSON(cmd.OutOrStdout(), app.Inventory{Operations: []app.OperationStatus{}}, usageErr); writeErr != nil {

@@ -11,6 +11,8 @@ const schemaVersion = 1
 const (
 	kindDiscovery = "discovery"
 	kindInventory = "inventory"
+	kindProfiles  = "profiles"
+	kindSnapshot  = "snapshot"
 )
 
 // discoveryEnvelope is the stable JSON envelope for discover output. Fields are
@@ -46,6 +48,51 @@ func newInventoryEnvelope(result app.Inventory) inventoryEnvelope {
 		Kind:          kindInventory,
 		Result:        result,
 	}
+}
+
+// profilesEnvelope is the stable JSON envelope for media profile output.
+type profilesEnvelope struct {
+	SchemaVersion int                     `json:"schema_version"`
+	Kind          string                  `json:"kind"`
+	Result        app.MediaProfilesResult `json:"result"`
+	Error         *errorEnvelope          `json:"error,omitempty"`
+}
+
+func newProfilesEnvelope(result app.MediaProfilesResult) profilesEnvelope {
+	return profilesEnvelope{
+		SchemaVersion: schemaVersion,
+		Kind:          kindProfiles,
+		Result:        result,
+	}
+}
+
+func newProfilesFailureEnvelope(result app.MediaProfilesResult, err error) profilesEnvelope {
+	envelope := newProfilesEnvelope(result)
+	envelope.Error = newErrorEnvelope(err)
+	return envelope
+}
+
+// snapshotEnvelope is the stable JSON envelope for credential-free snapshot
+// metadata. JPEG bytes and operational URIs cannot enter this type.
+type snapshotEnvelope struct {
+	SchemaVersion int                  `json:"schema_version"`
+	Kind          string               `json:"kind"`
+	Result        app.SnapshotMetadata `json:"result"`
+	Error         *errorEnvelope       `json:"error,omitempty"`
+}
+
+func newSnapshotEnvelope(result app.SnapshotMetadata) snapshotEnvelope {
+	return snapshotEnvelope{
+		SchemaVersion: schemaVersion,
+		Kind:          kindSnapshot,
+		Result:        result,
+	}
+}
+
+func newSnapshotFailureEnvelope(result app.SnapshotMetadata, err error) snapshotEnvelope {
+	envelope := newSnapshotEnvelope(result)
+	envelope.Error = newErrorEnvelope(err)
+	return envelope
 }
 
 // errorEnvelope is the stable, credential-free error projection included in a

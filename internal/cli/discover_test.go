@@ -37,9 +37,11 @@ func (s *stubInventory) Inventory(_ context.Context, request app.InventoryReques
 
 func testDependencies() Dependencies {
 	return Dependencies{
-		Discovery: stubDiscovery{},
-		Inventory: &stubInventory{},
-		LookupEnv: func(string) (string, bool) { return "", false },
+		Discovery:     stubDiscovery{},
+		Inventory:     &stubInventory{},
+		MediaProfiles: &stubMediaProfiles{},
+		Snapshot:      &stubSnapshot{},
+		LookupEnv:     func(string) (string, bool) { return "", false },
 	}
 }
 

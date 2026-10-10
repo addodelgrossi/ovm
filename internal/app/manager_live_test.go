@@ -131,3 +131,34 @@ func TestOpenSnapshotFeedUsesDeviceEndpointAndStoredCredentials(t *testing.T) {
 		t.Fatalf("error = %v, want authentication", err)
 	}
 }
+
+type fakeProbe struct {
+	request ProbeRequest
+	result  ProbeResult
+	err     error
+}
+
+func (f *fakeProbe) Probe(_ context.Context, request ProbeRequest) (ProbeResult, error) {
+	f.request = request
+	return f.result, f.err
+}
+
+func TestProbeStreamUsesStoredCredentialsAndKeepsPartialResults(t *testing.T) {
+	h := newHarness(t)
+	device := seedAuthenticatedStreamDevice(t, h, "192.168.44.40")
+	selection := StreamSelection{DeviceID: device.ID, ProfileToken: "profile_main", Transport: StreamTransportUDP}
+	if _, err := h.manager.ProbeStream(context.Background(), selection, 30*time.Second); err == nil {
+		t.Fatal("ProbeStream() without a probe succeeded")
+	}
+	probe := &fakeProbe{result: ProbeResult{Frames: 9}, err: newError(CategoryNetwork, "the camera stream could not be reached", nil)}
+	h.manager.probe = probe
+	result, err := h.manager.ProbeStream(context.Background(), selection, 30*time.Second)
+	var managed *ManagerError
+	if !errors.As(err, &managed) || managed.Category != CategoryNetwork || result.Frames != 9 {
+		t.Fatalf("result = %+v, error = %v", result, err)
+	}
+	if probe.request.Duration != 30*time.Second || probe.request.Transport != StreamTransportUDP ||
+		probe.request.ProfileToken != "profile_main" || probe.request.Credentials.Username() != "operator" {
+		t.Fatalf("request = %+v", probe.request)
+	}
+}

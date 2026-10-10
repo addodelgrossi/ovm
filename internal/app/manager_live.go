@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/addodelgrossi/ovm/pkg/stream"
 )
@@ -103,4 +104,38 @@ func (m *Manager) OpenSnapshotFeed(ctx context.Context, selection StreamSelectio
 		return nil, managerErrorFromApp(err)
 	}
 	return feed, nil
+}
+
+// ProbeStream measures the selected profile's stream for duration using the
+// stored credentials. A partial measurement accompanies an error.
+func (m *Manager) ProbeStream(ctx context.Context, selection StreamSelection, duration time.Duration) (ProbeResult, error) {
+	if err := m.ensureOpen(); err != nil {
+		return ProbeResult{}, err
+	}
+	if m.probe == nil {
+		return ProbeResult{}, newManagerError(CategoryInternal, "stream probing is not configured", nil)
+	}
+	device, resolveErr := m.resolveDevice(selection.DeviceID)
+	if resolveErr != nil {
+		return ProbeResult{}, resolveErr
+	}
+	request := ProbeRequest{
+		Host:         device.Endpoint,
+		ProfileToken: selection.ProfileToken,
+		Transport:    selection.Transport,
+		Duration:     duration,
+	}
+	if device.CredentialReference != "" {
+		credentials, release, credErr := m.loadCredentials(ctx, device)
+		if credErr != nil {
+			return ProbeResult{}, credErr
+		}
+		defer release()
+		request.Credentials = credentials
+	}
+	result, err := m.probe.Probe(ctx, request)
+	if err != nil {
+		return result, managerErrorFromApp(err)
+	}
+	return result, nil
 }

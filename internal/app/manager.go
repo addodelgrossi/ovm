@@ -58,6 +58,8 @@ type Manager struct {
 	liveStreams LiveStreamOpener
 	// snapshotFeeds is optional; without it OpenSnapshotFeed reports unavailable.
 	snapshotFeeds SnapshotFeedUseCase
+	// probe is optional; without it ProbeStream reports unavailable.
+	probe ProbeUseCase
 
 	mu sync.Mutex
 	// activeScan is the single in-flight scan's tracked cancel, if any.
@@ -91,6 +93,8 @@ type ManagerDependencies struct {
 	LiveStreams LiveStreamOpener
 	// SnapshotFeeds backs the JPEG preview fallback. It is optional.
 	SnapshotFeeds SnapshotFeedUseCase
+	// Probe measures streams for a fixed duration. It is optional.
+	Probe ProbeUseCase
 }
 
 // NewManager constructs a Manager from fully injected dependencies. It returns
@@ -109,6 +113,7 @@ func NewManager(deps ManagerDependencies) (*Manager, error) {
 		media:         deps.Media,
 		liveStreams:   deps.LiveStreams,
 		snapshotFeeds: deps.SnapshotFeeds,
+		probe:         deps.Probe,
 		deviceOps:     make(map[string]*trackedCancel),
 		statuses:      make(map[string]DeviceRuntimeStatus),
 	}, nil

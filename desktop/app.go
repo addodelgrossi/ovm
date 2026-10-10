@@ -32,6 +32,8 @@ type Manager interface {
 	OpenLiveStream(context.Context, core.StreamSelection) (stream.LiveSource, error)
 	OpenSnapshotFeed(context.Context, core.StreamSelection) (core.SnapshotFeed, error)
 	ProbeStream(context.Context, core.StreamSelection, time.Duration) (core.ProbeResult, error)
+	ReadEncoder(context.Context, string, string) (core.EncoderView, error)
+	ApplyEncoder(context.Context, string, string, core.EncoderChange) (core.EncoderApplyResult, error)
 	UpdatePreferences(context.Context, core.PreferencesRequest) (core.Overview, error)
 	Close() error
 }

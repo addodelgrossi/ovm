@@ -317,3 +317,35 @@ func TestProbeStreamValidatesAndReturnsPartialResults(t *testing.T) {
 		}
 	}
 }
+
+func TestEncoderBindingsValidateAndForwardToTheManager(t *testing.T) {
+	manager := newFakeManager()
+	var forwarded core.EncoderChange
+	manager.applyEncoderFn = func(_ context.Context, _, _ string, change core.EncoderChange) (core.EncoderApplyResult, error) {
+		forwarded = change
+		return core.EncoderApplyResult{Report: core.MutationReport{Outcome: core.OutcomeExact}}, nil
+	}
+	app, err := NewApp(AppDependencies{Manager: manager})
+	if err != nil {
+		t.Fatalf("NewApp() error = %v", err)
+	}
+	defer app.shutdown(context.Background())
+	change := core.EncoderChange{Encoding: "H264", Width: 1280, Height: 720, FrameRate: 25, BitrateKbps: 2048, GOPLength: 50, CodecProfile: "High"}
+	response := app.ApplyEncoder(ApplyEncoderRequest{DeviceID: "device-one", ProfileToken: "profile_main", Change: change})
+	if response.Error != nil || response.Result.Report.Outcome != core.OutcomeExact || forwarded != change {
+		t.Fatalf("response = %+v", response)
+	}
+	for _, bad := range []core.EncoderChange{
+		{Encoding: "", Width: 1, Height: 1, FrameRate: 1, BitrateKbps: 1},
+		{Encoding: "H264", Width: 0, Height: 1, FrameRate: 1, BitrateKbps: 1},
+		{Encoding: "H264", Width: 1, Height: 1, FrameRate: 0, BitrateKbps: 1},
+		{Encoding: "H264", Width: 1, Height: 1, FrameRate: 1, BitrateKbps: 0},
+	} {
+		if response := app.ApplyEncoder(ApplyEncoderRequest{DeviceID: "device-one", ProfileToken: "profile_main", Change: bad}); response.Error == nil {
+			t.Errorf("ApplyEncoder(%+v) accepted", bad)
+		}
+	}
+	if response := app.ReadEncoder(EncoderRequest{DeviceID: "", ProfileToken: "profile_main"}); response.Error == nil {
+		t.Error("ReadEncoder() accepted an empty device ID")
+	}
+}

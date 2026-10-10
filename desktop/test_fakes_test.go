@@ -28,6 +28,8 @@ type fakeManager struct {
 	liveFn         func(context.Context, core.StreamSelection) (stream.LiveSource, error)
 	snapshotFeedFn func(context.Context, core.StreamSelection) (core.SnapshotFeed, error)
 	probeFn        func(context.Context, core.StreamSelection, time.Duration) (core.ProbeResult, error)
+	readEncoderFn  func(context.Context, string, string) (core.EncoderView, error)
+	applyEncoderFn func(context.Context, string, string, core.EncoderChange) (core.EncoderApplyResult, error)
 	preferencesFn  func(context.Context, core.PreferencesRequest) (core.Overview, error)
 	closeFn        func() error
 }
@@ -162,6 +164,22 @@ func (f *fakeManager) ProbeStream(ctx context.Context, selection core.StreamSele
 		return f.probeFn(ctx, selection, duration)
 	}
 	return core.ProbeResult{}, errors.New("probe not configured")
+}
+
+func (f *fakeManager) ReadEncoder(ctx context.Context, deviceID, profileToken string) (core.EncoderView, error) {
+	f.called("read_encoder")
+	if f.readEncoderFn != nil {
+		return f.readEncoderFn(ctx, deviceID, profileToken)
+	}
+	return core.EncoderView{}, errors.New("encoder not configured")
+}
+
+func (f *fakeManager) ApplyEncoder(ctx context.Context, deviceID, profileToken string, change core.EncoderChange) (core.EncoderApplyResult, error) {
+	f.called("apply_encoder")
+	if f.applyEncoderFn != nil {
+		return f.applyEncoderFn(ctx, deviceID, profileToken, change)
+	}
+	return core.EncoderApplyResult{}, errors.New("encoder not configured")
 }
 
 func (f *fakeManager) UpdatePreferences(ctx context.Context, request core.PreferencesRequest) (core.Overview, error) {

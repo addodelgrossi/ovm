@@ -114,6 +114,7 @@ func NewEnvironment(ctx context.Context) (*Environment, error) {
 		Inventory:      app.NewProductionInventory(),
 		Media:          app.NewProductionMediaProfiles(),
 		LiveStreams:    app.NewProductionLiveStreams(),
+		SnapshotFeeds:  app.NewProductionSnapshotFeed(),
 	})
 	if err != nil {
 		_ = camera.Close()

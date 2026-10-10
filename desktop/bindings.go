@@ -446,6 +446,32 @@ func (a *App) StartPreview(request StartPreviewRequest) StartPreviewResponse {
 	return StartPreviewResponse{Result: result}
 }
 
+// StartSnapshotPreview opens the JPEG fallback for a device profile when the
+// WebView cannot decode the live codec. It accepts only identities.
+func (a *App) StartSnapshotPreview(request StartPreviewRequest) StartPreviewResponse {
+	selection, validationErr := validateStartPreviewRequest(request)
+	if validationErr != nil {
+		return StartPreviewResponse{Error: validationErr}
+	}
+	manager, ctx, finish, bindingErr := a.beginCall()
+	if bindingErr != nil {
+		return StartPreviewResponse{Error: bindingErr}
+	}
+	defer finish()
+
+	a.mu.Lock()
+	previews := a.previews
+	a.mu.Unlock()
+	if !previews.available() {
+		return StartPreviewResponse{Error: bindingUnavailable("preview_unavailable", "live preview is unavailable")}
+	}
+	result, err := previews.startSnapshot(ctx, manager, selection)
+	if err != nil {
+		return StartPreviewResponse{Error: bindingErrorFrom(err)}
+	}
+	return StartPreviewResponse{Result: result}
+}
+
 // StopPreview ends a preview session. Stopping an unknown or finished session
 // is not an error.
 func (a *App) StopPreview(request StopPreviewRequest) ActionResponse {

@@ -3,6 +3,10 @@
   import { api, type Locale, type PreviewStats } from '../lib/api'
   import { errorMessage, t } from '../lib/i18n'
   import { LivePlayer, type LivePlayerState } from '../lib/livePlayer'
+  import { SnapshotPlayer } from '../lib/snapshotPlayer'
+
+  type PreviewState =
+    LivePlayerState | { kind: 'fallback'; codec?: string; fps: number }
 
   let {
     locale,
@@ -17,10 +21,13 @@
   } = $props()
 
   let video = $state<HTMLVideoElement>()
+  let image = $state<HTMLImageElement>()
   let active = $state(false)
-  let playerState = $state<LivePlayerState | undefined>()
+  let showingSnapshots = $state(false)
+  let playerState = $state<PreviewState | undefined>()
   let stats = $state<PreviewStats | undefined>()
   let player: LivePlayer | undefined
+  let snapshotPlayer: SnapshotPlayer | undefined
   let sessionId = ''
   let statsTimer: ReturnType<typeof setInterval> | undefined
 
@@ -59,13 +66,45 @@
     sessionId = response.data.session_id
     statsTimer = setInterval(() => void refreshStats(), statsIntervalMs)
     player = new LivePlayer(video, response.data, (next) => {
+      if (
+        next.kind === 'mse_unavailable' ||
+        next.kind === 'codec_unsupported'
+      ) {
+        void fallBackToSnapshots(next)
+        return
+      }
       playerState = next
     })
     player.start()
   }
 
-  function stop(): void {
-    active = false
+  // The WebView cannot decode the live codec: replace the live session with
+  // authenticated JPEG snapshots from the same profile.
+  async function fallBackToSnapshots(reason: LivePlayerState): Promise<void> {
+    stopLive()
+    const codec = reason.kind === 'codec_unsupported' ? reason.codec : undefined
+    const response = await api.startSnapshotPreview(deviceId, profileToken)
+    if (!active) {
+      if (response.data) void api.stopPreview(response.data.session_id)
+      return
+    }
+    if (!response.data || !image) {
+      playerState = reason
+      return
+    }
+    sessionId = response.data.session_id
+    showingSnapshots = true
+    playerState = { kind: 'fallback', codec, fps: 1 }
+    snapshotPlayer = new SnapshotPlayer(image, response.data, (next) => {
+      playerState =
+        next.kind === 'running'
+          ? { kind: 'fallback', codec, fps: next.fps }
+          : { kind: 'failed' }
+    })
+    snapshotPlayer.start()
+  }
+
+  function stopLive(): void {
     if (statsTimer) clearInterval(statsTimer)
     statsTimer = undefined
     stats = undefined
@@ -73,11 +112,26 @@
     player = undefined
     if (sessionId) void api.stopPreview(sessionId)
     sessionId = ''
+  }
+
+  function stop(): void {
+    active = false
+    stopLive()
+    snapshotPlayer?.stop()
+    snapshotPlayer = undefined
+    showingSnapshots = false
     playerState = undefined
   }
 
-  function statusText(state: LivePlayerState): string {
+  function statusText(state: PreviewState): string {
     switch (state.kind) {
+      case 'fallback':
+        return state.codec
+          ? t(locale, 'live.fallback', {
+              codec: state.codec,
+              fps: number(state.fps)
+            })
+          : t(locale, 'live.fallbackNoMse', { fps: number(state.fps) })
       case 'connecting':
         return t(locale, 'live.connecting')
       case 'playing':
@@ -102,11 +156,17 @@
   <div class="live-frame" hidden={!active}>
     <video
       bind:this={video}
+      hidden={showingSnapshots}
       muted
       autoplay
       playsinline
       aria-label={t(locale, 'live.label', { profile: profileName })}
     ></video>
+    <img
+      bind:this={image}
+      hidden={!showingSnapshots}
+      alt={t(locale, 'live.fallbackLabel', { profile: profileName })}
+    />
   </div>
   <div class="url-actions">
     {#if active}

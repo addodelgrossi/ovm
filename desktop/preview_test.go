@@ -163,3 +163,50 @@ func TestStopPreviewValidatesSessionID(t *testing.T) {
 		}
 	}
 }
+
+type staticFeed struct{ image []byte }
+
+func (f staticFeed) Fetch(context.Context) ([]byte, error) { return f.image, nil }
+
+func TestPreviewControllerServesSnapshotFallback(t *testing.T) {
+	t.Parallel()
+	manager := newFakeManager()
+	var selected core.StreamSelection
+	manager.snapshotFeedFn = func(_ context.Context, selection core.StreamSelection) (core.SnapshotFeed, error) {
+		selected = selection
+		return staticFeed{image: []byte{0xFF, 0xD8, 0xFF, 0xD9}}, nil
+	}
+	controller := newPreviewController(syntheticPreviewSources, []string{wailsPageOrigin})
+	selection := core.StreamSelection{DeviceID: "device", ProfileToken: "profile", Transport: core.StreamTransportTCP}
+	result, err := controller.startSnapshot(context.Background(), manager, selection)
+	if err != nil {
+		t.Fatalf("startSnapshot() error = %v", err)
+	}
+	if selected != selection || !validPreviewSessionID(result.SessionID) {
+		t.Fatalf("selection = %+v, session = %q", selected, result.SessionID)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, result.URL, nil)
+	if err != nil {
+		t.Fatalf("NewRequest() error = %v", err)
+	}
+	request.Header.Set("Authorization", "Bearer "+result.Token)
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("Do() error = %v", err)
+	}
+	body, _ := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusOK || len(body) != 4 {
+		t.Fatalf("status = %d, body = % x", response.StatusCode, body)
+	}
+	if !controller.stop(result.SessionID) {
+		t.Fatal("stop() did not find the snapshot session")
+	}
+	closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer closeCancel()
+	if err := controller.close(closeCtx); err != nil {
+		t.Fatalf("close() error = %v", err)
+	}
+}

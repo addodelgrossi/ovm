@@ -49,6 +49,10 @@ export function StartPreview(
   arg1: main.StartPreviewRequest
 ): Promise<main.StartPreviewResponse>
 
+export function StartSnapshotPreview(
+  arg1: main.StartPreviewRequest
+): Promise<main.StartPreviewResponse>
+
 export function StopPreview(
   arg1: main.StopPreviewRequest
 ): Promise<main.ActionResponse>

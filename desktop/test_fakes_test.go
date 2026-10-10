@@ -14,19 +14,20 @@ type fakeManager struct {
 	mu    sync.Mutex
 	calls map[string]int
 
-	bootstrapFn   func(context.Context) (core.Overview, error)
-	interfacesFn  func(context.Context, core.HostInterfaceRequest) (core.HostInterfacesResult, error)
-	scanFn        func(context.Context, core.DiscoveryRequest) (core.ScanResult, error)
-	addFn         func(context.Context, core.ManualDeviceRequest) (core.DeviceDTO, error)
-	authFn        func(context.Context, core.AuthenticateRequest) (core.AuthenticateResult, error)
-	forgetFn      func(context.Context, string) (core.Overview, error)
-	selectFn      func(context.Context, string) (core.Overview, error)
-	overviewFn    func(context.Context) (core.Overview, error)
-	profilesFn    func(context.Context, string) (core.MediaProfilesResult, error)
-	resolveFn     func(context.Context, core.StreamSelection) (string, error)
-	liveFn        func(context.Context, core.StreamSelection) (stream.LiveSource, error)
-	preferencesFn func(context.Context, core.PreferencesRequest) (core.Overview, error)
-	closeFn       func() error
+	bootstrapFn    func(context.Context) (core.Overview, error)
+	interfacesFn   func(context.Context, core.HostInterfaceRequest) (core.HostInterfacesResult, error)
+	scanFn         func(context.Context, core.DiscoveryRequest) (core.ScanResult, error)
+	addFn          func(context.Context, core.ManualDeviceRequest) (core.DeviceDTO, error)
+	authFn         func(context.Context, core.AuthenticateRequest) (core.AuthenticateResult, error)
+	forgetFn       func(context.Context, string) (core.Overview, error)
+	selectFn       func(context.Context, string) (core.Overview, error)
+	overviewFn     func(context.Context) (core.Overview, error)
+	profilesFn     func(context.Context, string) (core.MediaProfilesResult, error)
+	resolveFn      func(context.Context, core.StreamSelection) (string, error)
+	liveFn         func(context.Context, core.StreamSelection) (stream.LiveSource, error)
+	snapshotFeedFn func(context.Context, core.StreamSelection) (core.SnapshotFeed, error)
+	preferencesFn  func(context.Context, core.PreferencesRequest) (core.Overview, error)
+	closeFn        func() error
 }
 
 func newFakeManager() *fakeManager {
@@ -143,6 +144,14 @@ func (f *fakeManager) OpenLiveStream(ctx context.Context, selection core.StreamS
 		return f.liveFn(ctx, selection)
 	}
 	return nil, errors.New("live stream not configured")
+}
+
+func (f *fakeManager) OpenSnapshotFeed(ctx context.Context, selection core.StreamSelection) (core.SnapshotFeed, error) {
+	f.called("snapshot_feed")
+	if f.snapshotFeedFn != nil {
+		return f.snapshotFeedFn(ctx, selection)
+	}
+	return nil, errors.New("snapshot feed not configured")
 }
 
 func (f *fakeManager) UpdatePreferences(ctx context.Context, request core.PreferencesRequest) (core.Overview, error) {

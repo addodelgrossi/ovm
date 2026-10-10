@@ -1657,7 +1657,8 @@ tbody th {
   aspect-ratio: 16 / 9;
 }
 
-.live-frame video {
+.live-frame video,
+.live-frame img {
   display: block;
   width: 100%;
   height: 100%;
@@ -1694,4 +1695,8 @@ tbody th {
 .live-stats dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
+}
+
+.live-frame [hidden] {
+  display: none;
 }

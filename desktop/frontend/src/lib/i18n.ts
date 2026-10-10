@@ -221,6 +221,11 @@ export const en = {
   'live.mseUnavailable':
     'This WebView does not support Media Source Extensions, so live video cannot play here.',
   'live.codecUnsupported': 'This WebView cannot decode the {codec} stream.',
+  'live.fallback':
+    'This WebView cannot play the {codec} stream, so ovm shows camera snapshots at about {fps} fps instead.',
+  'live.fallbackNoMse':
+    'This WebView cannot play live video, so ovm shows camera snapshots at about {fps} fps instead.',
+  'live.fallbackLabel': 'Snapshot preview of {profile}',
   'live.statsLabel': 'Measured stream statistics',
   'live.statResolution': 'Resolution',
   'live.statFps': 'Frame rate',
@@ -528,6 +533,11 @@ export const ptBR: Record<TranslationKey, string> = {
     'Este WebView não oferece Media Source Extensions, então o vídeo ao vivo não pode ser reproduzido aqui.',
   'live.codecUnsupported':
     'Este WebView não consegue decodificar a transmissão {codec}.',
+  'live.fallback':
+    'Este WebView não consegue reproduzir a transmissão {codec}, então o ovm mostra imagens da câmera a cerca de {fps} qps.',
+  'live.fallbackNoMse':
+    'Este WebView não consegue reproduzir vídeo ao vivo, então o ovm mostra imagens da câmera a cerca de {fps} qps.',
+  'live.fallbackLabel': 'Prévia por imagens de {profile}',
   'live.statsLabel': 'Estatísticas medidas da transmissão',
   'live.statResolution': 'Resolução',
   'live.statFps': 'Taxa de quadros',

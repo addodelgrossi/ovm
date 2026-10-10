@@ -36,8 +36,38 @@ const apiMock = vi.hoisted(() => ({
   copyText: vi.fn(),
   startPreview: vi.fn(),
   stopPreview: vi.fn(),
-  previewStats: vi.fn()
+  previewStats: vi.fn(),
+  startSnapshotPreview: vi.fn()
 }))
+
+const liveSession = {
+  session_id: '0123456789abcdef0123456789abcdef',
+  url: 'http://127.0.0.1:49152/v1/sessions/0123456789abcdef0123456789abcdef',
+  token: 'synthetic-token'
+}
+
+const snapshotSession = {
+  session_id: 'fedcba9876543210fedcba9876543210',
+  url: 'http://127.0.0.1:49152/v1/snapshots/fedcba9876543210fedcba9876543210',
+  token: 'synthetic-token'
+}
+
+function stubMediaSource(): void {
+  class PendingMediaSource {
+    static isTypeSupported(): boolean {
+      return true
+    }
+    addEventListener(): void {}
+  }
+  vi.stubGlobal('MediaSource', PendingMediaSource)
+  vi.stubGlobal(
+    'URL',
+    Object.assign(URL, {
+      createObjectURL: () => 'blob:stub',
+      revokeObjectURL: () => undefined
+    })
+  )
+}
 
 vi.mock('./lib/api', () => ({ api: apiMock }))
 
@@ -353,6 +383,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
 })
 
 describe('App M3 integration', () => {
@@ -855,7 +886,7 @@ describe('App M3 integration', () => {
     ).toBeGreaterThan(0)
   })
 
-  it('starts and stops a live preview by identifiers and reports missing MSE', async () => {
+  it('starts and stops a live preview by identifiers and shows measured statistics', async () => {
     apiMock.bootstrap.mockResolvedValue({
       data: makeBootstrap(makeOverview(), {
         demo: true,
@@ -864,13 +895,7 @@ describe('App M3 integration', () => {
         live_preview_available: true
       })
     })
-    apiMock.startPreview.mockResolvedValue({
-      data: {
-        session_id: '0123456789abcdef0123456789abcdef',
-        url: 'http://127.0.0.1:49152/v1/sessions/0123456789abcdef0123456789abcdef',
-        token: 'synthetic-token'
-      }
-    })
+    apiMock.startPreview.mockResolvedValue({ data: liveSession })
     apiMock.stopPreview.mockResolvedValue({ data: { completed: true } })
     apiMock.previewStats.mockResolvedValue({
       data: {
@@ -889,6 +914,8 @@ describe('App M3 integration', () => {
         first_frame_received: true
       }
     })
+    // A Media Source that never opens keeps the live session connecting.
+    stubMediaSource()
     await renderReady()
     await fireEvent.click(screen.getByRole('tab', { name: /Streams/ }))
     await screen.findByRole('heading', { name: 'Profile Main stream' })
@@ -900,12 +927,7 @@ describe('App M3 integration', () => {
       'camera-front',
       'profile_main'
     )
-    // jsdom has no Media Source Extensions, which the player must report.
-    expect(
-      await screen.findByText(
-        'This WebView does not support Media Source Extensions, so live video cannot play here.'
-      )
-    ).toBeTruthy()
+    expect(await screen.findByText('Connecting to the preview…')).toBeTruthy()
 
     const stats = await screen.findByLabelText(
       'Measured stream statistics',
@@ -918,14 +940,77 @@ describe('App M3 integration', () => {
     expect(stats.textContent).toContain('50 frames (2.00 s)')
     expect(stats.textContent).toContain('118 ms')
     expect(stats.textContent).toContain('Reconnects 1')
-    expect(apiMock.previewStats).toHaveBeenCalledWith(
-      '0123456789abcdef0123456789abcdef'
-    )
+    expect(apiMock.previewStats).toHaveBeenCalledWith(liveSession.session_id)
 
     await fireEvent.click(screen.getByRole('button', { name: 'Stop preview' }))
-    expect(apiMock.stopPreview).toHaveBeenCalledWith(
-      '0123456789abcdef0123456789abcdef'
+    expect(apiMock.stopPreview).toHaveBeenCalledWith(liveSession.session_id)
+  })
+
+  it('falls back to authenticated snapshots when the WebView cannot play video', async () => {
+    apiMock.bootstrap.mockResolvedValue({
+      data: makeBootstrap(makeOverview(), {
+        demo: true,
+        rtsp_playback_available: false,
+        vlc_available: false,
+        live_preview_available: true
+      })
+    })
+    apiMock.startPreview.mockResolvedValue({ data: liveSession })
+    apiMock.startSnapshotPreview.mockResolvedValue({ data: snapshotSession })
+    apiMock.stopPreview.mockResolvedValue({ data: { completed: true } })
+    await renderReady()
+    await fireEvent.click(screen.getByRole('tab', { name: /Streams/ }))
+    await screen.findByRole('heading', { name: 'Profile Main stream' })
+
+    await fireEvent.click(
+      screen.getAllByRole('button', { name: 'Start live preview' })[0]
     )
+    // jsdom has no Media Source Extensions, so the preview must fall back.
+    expect(
+      await screen.findByText(
+        'This WebView cannot play live video, so ovm shows camera snapshots at about 1.0 fps instead.'
+      )
+    ).toBeTruthy()
+    expect(apiMock.stopPreview).toHaveBeenCalledWith(liveSession.session_id)
+    expect(apiMock.startSnapshotPreview).toHaveBeenCalledWith(
+      'camera-front',
+      'profile_main'
+    )
+    expect(screen.getByAltText('Snapshot preview of Main stream')).toBeTruthy()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Stop preview' }))
+    expect(apiMock.stopPreview).toHaveBeenCalledWith(snapshotSession.session_id)
+  })
+
+  it('reports missing MSE when the snapshot fallback is unavailable too', async () => {
+    apiMock.bootstrap.mockResolvedValue({
+      data: makeBootstrap(makeOverview(), {
+        demo: true,
+        rtsp_playback_available: false,
+        vlc_available: false,
+        live_preview_available: true
+      })
+    })
+    apiMock.startPreview.mockResolvedValue({ data: liveSession })
+    apiMock.startSnapshotPreview.mockResolvedValue({
+      error: {
+        category: 'protocol',
+        code: 'operation_protocol',
+        message: 'no snapshot'
+      }
+    })
+    apiMock.stopPreview.mockResolvedValue({ data: { completed: true } })
+    await renderReady()
+    await fireEvent.click(screen.getByRole('tab', { name: /Streams/ }))
+    await screen.findByRole('heading', { name: 'Profile Main stream' })
+    await fireEvent.click(
+      screen.getAllByRole('button', { name: 'Start live preview' })[0]
+    )
+    expect(
+      await screen.findByText(
+        'This WebView does not support Media Source Extensions, so live video cannot play here.'
+      )
+    ).toBeTruthy()
   })
 
   it('explains why a live preview could not start', async () => {

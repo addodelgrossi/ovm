@@ -364,3 +364,20 @@ func readProfileAccessUnits(t *testing.T, env *Environment, profile string, coun
 	}
 	return source.Codec()
 }
+
+// TestSnapshotFeedServesDemoJPEGs exercises the JPEG preview fallback.
+func TestSnapshotFeedServesDemoJPEGs(t *testing.T) {
+	env := newTestEnvironment(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	feed, err := env.Manager().OpenSnapshotFeed(ctx, app.StreamSelection{
+		DeviceID: env.DeviceID(), ProfileToken: "profile_main", Transport: app.StreamTransportTCP,
+	})
+	if err != nil {
+		t.Fatalf("OpenSnapshotFeed() error = %v", err)
+	}
+	image, err := feed.Fetch(ctx)
+	if err != nil || len(image) < 4 || image[0] != 0xFF || image[1] != 0xD8 {
+		t.Fatalf("Fetch() = %d bytes, error = %v", len(image), err)
+	}
+}

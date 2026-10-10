@@ -26,11 +26,12 @@ type previewController struct {
 	factory PreviewSourceFactory
 	origins []string
 
-	mu     sync.Mutex
-	server *preview.Server
-	active map[string]*activePreview
-	closed bool
-	wg     sync.WaitGroup
+	mu        sync.Mutex
+	server    *preview.Server
+	active    map[string]*activePreview
+	snapshots map[string]*preview.SnapshotSession
+	closed    bool
+	wg        sync.WaitGroup
 }
 
 type activePreview struct {
@@ -39,7 +40,12 @@ type activePreview struct {
 }
 
 func newPreviewController(factory PreviewSourceFactory, origins []string) *previewController {
-	return &previewController{factory: factory, origins: origins, active: make(map[string]*activePreview)}
+	return &previewController{
+		factory:   factory,
+		origins:   origins,
+		active:    make(map[string]*activePreview),
+		snapshots: make(map[string]*preview.SnapshotSession),
+	}
 }
 
 func (c *previewController) available() bool { return c != nil && c.factory != nil }
@@ -52,20 +58,15 @@ func (c *previewController) start(callCtx, root context.Context, manager Manager
 		c.mu.Unlock()
 		return nil, preview.ErrClosed
 	}
-	if len(c.active) >= maxConcurrentPreviews {
+	if len(c.active)+len(c.snapshots) >= maxConcurrentPreviews {
 		c.mu.Unlock()
 		return nil, errPreviewLimit
 	}
-	if c.server == nil {
-		server, err := preview.NewServer(c.origins)
-		if err != nil {
-			c.mu.Unlock()
-			return nil, err
-		}
-		c.server = server
-	}
-	server := c.server
+	server, err := c.serverLocked()
 	c.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
 
 	// Time to first frame includes connecting to the camera.
 	meter := stream.NewMeter(nil)
@@ -84,7 +85,7 @@ func (c *previewController) start(callCtx, root context.Context, manager Manager
 	metered := stream.NewMeteredSource(source, meter)
 	ctx, cancel := context.WithCancel(root)
 	c.mu.Lock()
-	if c.closed || len(c.active) >= maxConcurrentPreviews {
+	if c.closed || len(c.active)+len(c.snapshots) >= maxConcurrentPreviews {
 		c.mu.Unlock()
 		cancel()
 		session.Close()
@@ -119,6 +120,62 @@ func (c *previewController) start(callCtx, root context.Context, manager Manager
 	}, nil
 }
 
+// serverLocked starts the bridge on first use. c.mu must be held.
+func (c *previewController) serverLocked() (*preview.Server, error) {
+	if c.server == nil {
+		server, err := preview.NewServer(c.origins)
+		if err != nil {
+			return nil, err
+		}
+		c.server = server
+	}
+	return c.server, nil
+}
+
+// startSnapshot opens the JPEG fallback for a selection. It shares the
+// preview limit with live sessions.
+func (c *previewController) startSnapshot(callCtx context.Context, manager Manager, selection core.StreamSelection) (*StartPreviewResult, error) {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil, preview.ErrClosed
+	}
+	if len(c.active)+len(c.snapshots) >= maxConcurrentPreviews {
+		c.mu.Unlock()
+		return nil, errPreviewLimit
+	}
+	server, err := c.serverLocked()
+	c.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	feed, err := manager.OpenSnapshotFeed(callCtx, selection)
+	if err != nil {
+		return nil, err
+	}
+	session, err := server.NewSnapshotSession(feed.Fetch)
+	if err != nil {
+		return nil, err
+	}
+	c.mu.Lock()
+	if c.closed || len(c.active)+len(c.snapshots) >= maxConcurrentPreviews {
+		closed := c.closed
+		c.mu.Unlock()
+		session.Close()
+		if closed {
+			return nil, preview.ErrClosed
+		}
+		return nil, errPreviewLimit
+	}
+	c.snapshots[session.ID()] = session
+	c.mu.Unlock()
+	return &StartPreviewResult{
+		SessionID: session.ID(),
+		URL:       server.BaseURL() + session.Path(),
+		Token:     server.Token(),
+	}, nil
+}
+
 // stats returns the measurements of an active preview.
 func (c *previewController) stats(sessionID string) (stream.Stats, bool) {
 	c.mu.Lock()
@@ -133,7 +190,13 @@ func (c *previewController) stats(sessionID string) (stream.Stats, bool) {
 func (c *previewController) stop(sessionID string) bool {
 	c.mu.Lock()
 	active := c.active[sessionID]
+	snapshot := c.snapshots[sessionID]
+	delete(c.snapshots, sessionID)
 	c.mu.Unlock()
+	if snapshot != nil {
+		snapshot.Close()
+		return true
+	}
 	if active == nil {
 		return false
 	}
@@ -154,6 +217,10 @@ func (c *previewController) close(ctx context.Context) error {
 	c.closed = true
 	for _, active := range c.active {
 		active.cancel()
+	}
+	for id, snapshot := range c.snapshots {
+		snapshot.Close()
+		delete(c.snapshots, id)
 	}
 	server := c.server
 	c.mu.Unlock()

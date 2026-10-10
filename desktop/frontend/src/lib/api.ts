@@ -13,6 +13,7 @@ import {
   Scan,
   SelectDevice,
   StartPreview,
+  StartSnapshotPreview,
   StopPreview,
   UpdatePreferences
 } from '../../wailsjs/go/main/App.js'
@@ -318,6 +319,10 @@ export interface OvmApi {
     profileToken: string
   ): Promise<ApiResponse<PreviewSession>>
   stopPreview(sessionId: string): Promise<ApiResponse<{ completed: boolean }>>
+  startSnapshotPreview(
+    deviceId: string,
+    profileToken: string
+  ): Promise<ApiResponse<PreviewSession>>
   previewStats(sessionId: string): Promise<ApiResponse<PreviewStats>>
 }
 
@@ -398,6 +403,10 @@ export const api: OvmApi = {
   startPreview: (deviceId, profileToken) =>
     invoke<PreviewSession>(() =>
       StartPreview({ device_id: deviceId, profile_token: profileToken })
+    ),
+  startSnapshotPreview: (deviceId, profileToken) =>
+    invoke<PreviewSession>(() =>
+      StartSnapshotPreview({ device_id: deviceId, profile_token: profileToken })
     ),
   stopPreview: (sessionId) =>
     invoke<{ completed: boolean }>(() =>

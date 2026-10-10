@@ -30,6 +30,7 @@ type Manager interface {
 	Profiles(context.Context, string) (core.MediaProfilesResult, error)
 	ResolveStreamURI(context.Context, core.StreamSelection) (string, error)
 	OpenLiveStream(context.Context, core.StreamSelection) (stream.LiveSource, error)
+	OpenSnapshotFeed(context.Context, core.StreamSelection) (core.SnapshotFeed, error)
 	UpdatePreferences(context.Context, core.PreferencesRequest) (core.Overview, error)
 	Close() error
 }

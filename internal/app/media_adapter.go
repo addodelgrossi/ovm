@@ -38,6 +38,8 @@ type productionMedia struct {
 	httpClient *http.Client
 	// readbackPolicy overrides the configuration read-back schedule in tests.
 	readbackPolicy *readbackPolicy
+	// clock overrides the local clock used to set and measure camera time.
+	clock func() time.Time
 }
 
 // NewProductionMediaProfiles returns the production MediaProfilesUseCase.

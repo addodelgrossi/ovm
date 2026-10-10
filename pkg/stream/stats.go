@@ -32,6 +32,8 @@ type Stats struct {
 	Bytes            uint64        `json:"bytes"`
 	// LostPackets is reported by sources that can detect RTP loss.
 	LostPackets uint64 `json:"lost_packets"`
+	// Reconnects is reported by sources that re-establish their connection.
+	Reconnects uint64 `json:"reconnects"`
 	// Elapsed is the wall time since Start.
 	Elapsed time.Duration `json:"elapsed_ns"`
 }
@@ -60,6 +62,7 @@ type Meter struct {
 	width       int
 	height      int
 	lossSource  interface{ LostPackets() uint64 }
+	retrySource interface{ Reconnects() uint64 }
 }
 
 // NewMeter starts measuring now. A nil clock uses time.Now.
@@ -140,6 +143,9 @@ func (m *Meter) Snapshot() Stats {
 	if m.lossSource != nil {
 		stats.LostPackets = m.lossSource.LostPackets()
 	}
+	if m.retrySource != nil {
+		stats.Reconnects = m.retrySource.Reconnects()
+	}
 	if n := len(m.window); n >= 2 {
 		span := m.window[n-1].pts - m.window[0].pts
 		if span > 0 {
@@ -156,7 +162,8 @@ func (m *Meter) Snapshot() Stats {
 }
 
 // MeteredSource measures every access unit read from an H264Source. When the
-// wrapped source reports RTP loss (LostPackets), the meter includes it.
+// wrapped source reports RTP loss (LostPackets) or reconnections
+// (Reconnects), the meter includes them.
 type MeteredSource struct {
 	H264Source
 	meter *Meter
@@ -164,11 +171,14 @@ type MeteredSource struct {
 
 // NewMeteredSource wraps source with meter.
 func NewMeteredSource(source H264Source, meter *Meter) *MeteredSource {
+	meter.mu.Lock()
 	if loss, ok := source.(interface{ LostPackets() uint64 }); ok {
-		meter.mu.Lock()
 		meter.lossSource = loss
-		meter.mu.Unlock()
 	}
+	if retry, ok := source.(interface{ Reconnects() uint64 }); ok {
+		meter.retrySource = retry
+	}
+	meter.mu.Unlock()
 	return &MeteredSource{H264Source: source, meter: meter}
 }
 

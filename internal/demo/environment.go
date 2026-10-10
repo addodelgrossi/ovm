@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/addodelgrossi/ovm/internal/app"
 	"github.com/addodelgrossi/ovm/internal/store"
@@ -82,9 +83,11 @@ type Runtime struct {
 // leaks.
 func NewEnvironment(ctx context.Context) (*Environment, error) {
 	// The synthetic RTSP server requires the same demo credentials, so live
-	// preview exercises the production RTSP client end to end.
+	// preview exercises the production RTSP client end to end. Like the
+	// advertised profiles, the main stream is H.265 and the others are H.264.
 	rtsp, err := synthmedia.StartRTSPServer(synthmedia.RTSPServerConfig{
 		Video:            synthmedia.H264Config{Width: 640, Height: 352, FPS: 25, GOP: 50},
+		Route:            demoStreamCodec,
 		Username:         demoUsername,
 		Password:         demoPassword,
 		SDPParameterSets: true,
@@ -224,4 +227,13 @@ func (e *Environment) Close(ctx context.Context) error {
 	cameraErr := e.camera.Shutdown(ctx)
 	e.rtsp.Close()
 	return errors.Join(managerErr, cameraErr)
+}
+
+// demoStreamCodec routes the main profile, which the fake camera advertises as
+// H.265, to the H.265 stream and every other profile to H.264.
+func demoStreamCodec(_, query string) string {
+	if values, err := url.ParseQuery(query); err == nil && values.Get("profile") == "profile_main" {
+		return synthmedia.CodecH265
+	}
+	return synthmedia.CodecH264
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/addodelgrossi/ovm/internal/app"
+	"github.com/addodelgrossi/ovm/pkg/stream"
 )
 
 // newTestEnvironment builds a demo environment and registers an idempotent
@@ -327,28 +328,39 @@ func TestDemoScanAndInterfacesStayInsideSyntheticLoopback(t *testing.T) {
 // through the production Manager and RTSP client and decodes access units.
 func TestLiveStreamRunsThroughAuthenticatedSyntheticRTSP(t *testing.T) {
 	env := newTestEnvironment(t)
-	readLiveAccessUnits(t, env, 10)
+	if codec := readLiveAccessUnits(t, env, 10); codec != stream.CodecH265 {
+		t.Fatalf("main profile codec = %q, want H.265", codec)
+	}
+	if codec := readProfileAccessUnits(t, env, "profile_sub", 10); codec != stream.CodecH264 {
+		t.Fatalf("sub profile codec = %q, want H.264", codec)
+	}
 }
 
-func readLiveAccessUnits(t *testing.T, env *Environment, count int) {
+func readLiveAccessUnits(t *testing.T, env *Environment, count int) string {
+	t.Helper()
+	return readProfileAccessUnits(t, env, "profile_main", count)
+}
+
+func readProfileAccessUnits(t *testing.T, env *Environment, profile string, count int) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	source, err := env.Manager().OpenLiveStream(ctx, app.StreamSelection{
 		DeviceID:     env.DeviceID(),
-		ProfileToken: "profile_main",
+		ProfileToken: profile,
 		Transport:    app.StreamTransportTCP,
 	})
 	if err != nil {
 		t.Fatalf("OpenLiveStream() error = %v", err)
 	}
 	defer source.Close()
-	if len(source.SPS()) == 0 {
-		t.Fatal("the synthetic RTSP session description carries no SPS")
+	if len(source.ParameterSets()) == 0 {
+		t.Fatal("the synthetic RTSP session description carries no parameter sets")
 	}
 	for i := 0; i < count; i++ {
 		if _, _, err := source.ReadAccessUnit(ctx); err != nil {
 			t.Fatalf("ReadAccessUnit(%d) error = %v", i, err)
 		}
 	}
+	return source.Codec()
 }

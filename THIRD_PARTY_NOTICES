@@ -1,8 +1,9 @@
 # Third-Party Notices
 
-The following runtime dependency is introduced by the native secret-provider
-adapters in this M3 slice. The complete artifact-specific dependency inventory
-is generated from the locked module graph and reviewed before release.
+The following runtime dependencies were introduced by the native
+secret-provider adapters (M3) and the live-preview pipeline (M4). The complete
+artifact-specific dependency inventory is generated from the locked module
+graph and reviewed before release.
 
 ## github.com/zalando/go-keyring
 
@@ -14,6 +15,22 @@ is generated from the locked module graph and reviewed before release.
 
 The dependency's MIT license text is available at:
 https://github.com/zalando/go-keyring/blob/v0.2.8/LICENSE
+
+## github.com/bluenviron/mediacommon/v2
+
+- Version: v2.9.6
+- Copyright: Copyright (c) 2023 aler9
+- License: MIT
+- Source: https://github.com/bluenviron/mediacommon/tree/v2.9.6
+- Use: H.264 parsing and fragmented MP4 packaging
+
+## github.com/abema/go-mp4
+
+- Version: v1.7.3
+- Copyright: Copyright (c) 2020 AbemaTV
+- License: MIT
+- Source: https://github.com/abema/go-mp4/tree/v1.7.3
+- Use: MP4 box encoding (dependency of mediacommon)
 
 Build-only tools that are not distributed are documented separately by the
 release workflow.

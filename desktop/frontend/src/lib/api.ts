@@ -11,6 +11,8 @@ import {
   OpenInVLC,
   Scan,
   SelectDevice,
+  StartPreview,
+  StopPreview,
   UpdatePreferences
 } from '../../wailsjs/go/main/App.js'
 import { ClipboardSetText } from '../../wailsjs/runtime/runtime.js'
@@ -63,6 +65,13 @@ export interface CapabilityFlags {
   demo: boolean
   rtsp_playback_available: boolean
   vlc_available: boolean
+  live_preview_available: boolean
+}
+
+export interface PreviewSession {
+  session_id: string
+  url: string
+  token: string
 }
 
 export interface BootstrapResult {
@@ -287,6 +296,11 @@ export interface OvmApi {
     transport: Transport
   ): Promise<ApiResponse<{ completed: boolean }>>
   copyText(text: string): Promise<boolean>
+  startPreview(
+    deviceId: string,
+    profileToken: string
+  ): Promise<ApiResponse<PreviewSession>>
+  stopPreview(sessionId: string): Promise<ApiResponse<{ completed: boolean }>>
 }
 
 interface BindingEnvelope<T> {
@@ -362,6 +376,14 @@ export const api: OvmApi = {
         profile_token: profileToken,
         transport
       })
+    ),
+  startPreview: (deviceId, profileToken) =>
+    invoke<PreviewSession>(() =>
+      StartPreview({ device_id: deviceId, profile_token: profileToken })
+    ),
+  stopPreview: (sessionId) =>
+    invoke<{ completed: boolean }>(() =>
+      StopPreview({ session_id: sessionId })
     ),
   async copyText(text) {
     // The native clipboard works even when the WebView blocks navigator.clipboard.

@@ -44,6 +44,7 @@ type AppDependencies struct {
 	Manager         Manager
 	DemoCloser      LifecycleCloser
 	VLC             VLCLauncher
+	PreviewSources  PreviewSourceFactory
 	Demo            bool
 	CallTimeout     time.Duration
 	ShutdownTimeout time.Duration
@@ -61,6 +62,7 @@ type App struct {
 	manager    Manager
 	demoCloser LifecycleCloser
 	vlc        VLCLauncher
+	previews   *previewController
 	caps       CapabilityFlags
 
 	callTimeout     time.Duration
@@ -97,16 +99,19 @@ func NewApp(deps AppDependencies) (*App, error) {
 	idle := make(chan struct{})
 	close(idle)
 	vlcAvailable := deps.VLC != nil && deps.VLC.Available() && !deps.Demo
+	previews := newPreviewController(deps.PreviewSources, []string{wailsPageOrigin})
 	return &App{
 		rootCtx:    rootCtx,
 		cancel:     cancel,
 		manager:    deps.Manager,
 		demoCloser: deps.DemoCloser,
 		vlc:        deps.VLC,
+		previews:   previews,
 		caps: CapabilityFlags{
 			Demo:                  deps.Demo,
 			RTSPPlaybackAvailable: vlcAvailable,
 			VLCAvailable:          vlcAvailable,
+			LivePreviewAvailable:  previews.available(),
 		},
 		callTimeout:     callTimeout,
 		shutdownTimeout: shutdownTimeout,
@@ -155,6 +160,7 @@ func (a *App) close(ctx context.Context) error {
 	scan := a.scan
 	a.scan = nil
 	idle := a.idle
+	previews := a.previews
 	a.mu.Unlock()
 
 	if rootCancel != nil {
@@ -165,6 +171,9 @@ func (a *App) close(ctx context.Context) error {
 	}
 
 	var closeErrors []error
+	if err := previews.close(ctx); err != nil {
+		closeErrors = append(closeErrors, err)
+	}
 	if manager != nil {
 		if err := manager.Close(); err != nil {
 			closeErrors = append(closeErrors, err)
@@ -197,6 +206,7 @@ func (a *App) close(ctx context.Context) error {
 	a.manager = nil
 	a.demoCloser = nil
 	a.vlc = nil
+	a.previews = nil
 	a.rootCtx = nil
 	a.cancel = nil
 	a.closeErr = finalErr

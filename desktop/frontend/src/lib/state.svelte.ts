@@ -55,7 +55,8 @@ const emptyOverview = (): Overview => ({
 const defaultCapabilities = (): CapabilityFlags => ({
   demo: false,
   rtsp_playback_available: false,
-  vlc_available: false
+  vlc_available: false,
+  live_preview_available: false
 })
 
 function replaceDevice(devices: Device[], device: Device): Device[] {

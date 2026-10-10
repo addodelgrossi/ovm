@@ -113,6 +113,33 @@ func validateOpenInVLCRequest(request OpenInVLCRequest) (core.StreamSelection, *
 	}, nil
 }
 
+func validateStartPreviewRequest(request StartPreviewRequest) (core.StreamSelection, *BindingError) {
+	if err := validateDeviceID(request.DeviceID, false); err != nil {
+		return core.StreamSelection{}, err
+	}
+	if err := core.ValidateSnapshotProfileToken(request.ProfileToken); err != nil {
+		return core.StreamSelection{}, bindingValidation("invalid_profile_token", "the media profile token is not valid")
+	}
+	return core.StreamSelection{
+		DeviceID:     request.DeviceID,
+		ProfileToken: request.ProfileToken,
+		Transport:    core.StreamTransportTCP,
+	}, nil
+}
+
+// validPreviewSessionID accepts the bridge's 32-character lowercase hex IDs.
+func validPreviewSessionID(value string) bool {
+	if len(value) != 32 {
+		return false
+	}
+	for _, r := range value {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 func validBoundaryText(value string, maximum int, required bool) bool {
 	if value == "" {
 		return !required

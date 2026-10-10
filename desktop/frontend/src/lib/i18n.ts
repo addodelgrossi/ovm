@@ -210,7 +210,17 @@ export const en = {
   'streams.vlcUnavailable':
     'VLC was not found at a supported local installation path.',
   'streams.vlcDemo':
-    'Playback is disabled in demo mode because no real RTSP stream exists.',
+    'VLC is disabled in demo mode because no real RTSP stream exists. Live preview shows a synthetic test pattern.',
+  'live.start': 'Start live preview',
+  'live.stop': 'Stop preview',
+  'live.label': 'Live preview of {profile}',
+  'live.connecting': 'Connecting to the preview…',
+  'live.playing': 'Live',
+  'live.ended': 'The preview ended.',
+  'live.failed': 'The live preview could not start.',
+  'live.mseUnavailable':
+    'This WebView does not support Media Source Extensions, so live video cannot play here.',
+  'live.codecUnsupported': 'This WebView cannot decode the {codec} stream.',
   'streams.playbackUnavailable': 'RTSP playback is unavailable in this build.',
   'streams.operations': 'Profile operations',
   'streams.operationSource': '{operation}: {state} via {source}',
@@ -497,7 +507,18 @@ export const ptBR: Record<TranslationKey, string> = {
   'streams.vlcUnavailable':
     'O VLC não foi encontrado em um caminho de instalação local compatível.',
   'streams.vlcDemo':
-    'A reprodução é desativada na demonstração porque não existe uma transmissão RTSP real.',
+    'O VLC é desativado na demonstração porque não existe uma transmissão RTSP real. A prévia ao vivo mostra um padrão de teste sintético.',
+  'live.start': 'Iniciar prévia ao vivo',
+  'live.stop': 'Parar prévia',
+  'live.label': 'Prévia ao vivo de {profile}',
+  'live.connecting': 'Conectando à prévia…',
+  'live.playing': 'Ao vivo',
+  'live.ended': 'A prévia terminou.',
+  'live.failed': 'Não foi possível iniciar a prévia ao vivo.',
+  'live.mseUnavailable':
+    'Este WebView não oferece Media Source Extensions, então o vídeo ao vivo não pode ser reproduzido aqui.',
+  'live.codecUnsupported':
+    'Este WebView não consegue decodificar a transmissão {codec}.',
   'streams.playbackUnavailable':
     'A reprodução RTSP está indisponível nesta compilação.',
   'streams.operations': 'Operações do perfil',

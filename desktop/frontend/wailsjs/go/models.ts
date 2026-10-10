@@ -866,6 +866,7 @@ export namespace main {
     demo: boolean
     rtsp_playback_available: boolean
     vlc_available: boolean
+    live_preview_available: boolean
 
     static createFrom(source: any = {}) {
       return new CapabilityFlags(source)
@@ -876,6 +877,7 @@ export namespace main {
       this.demo = source['demo']
       this.rtsp_playback_available = source['rtsp_playback_available']
       this.vlc_available = source['vlc_available']
+      this.live_preview_available = source['live_preview_available']
     }
   }
   export class BootstrapResult {
@@ -1221,6 +1223,81 @@ export namespace main {
         return new classs(a)
       }
       return a
+    }
+  }
+  export class StartPreviewRequest {
+    device_id: string
+    profile_token: string
+
+    static createFrom(source: any = {}) {
+      return new StartPreviewRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.device_id = source['device_id']
+      this.profile_token = source['profile_token']
+    }
+  }
+  export class StartPreviewResult {
+    session_id: string
+    url: string
+    token: string
+
+    static createFrom(source: any = {}) {
+      return new StartPreviewResult(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.session_id = source['session_id']
+      this.url = source['url']
+      this.token = source['token']
+    }
+  }
+  export class StartPreviewResponse {
+    result?: StartPreviewResult
+    error?: BindingError
+
+    static createFrom(source: any = {}) {
+      return new StartPreviewResponse(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.result = this.convertValues(source['result'], StartPreviewResult)
+      this.error = this.convertValues(source['error'], BindingError)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+
+  export class StopPreviewRequest {
+    session_id: string
+
+    static createFrom(source: any = {}) {
+      return new StopPreviewRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.session_id = source['session_id']
     }
   }
   export class UpdatePreferencesRequest {

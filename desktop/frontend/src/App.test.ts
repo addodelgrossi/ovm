@@ -33,7 +33,9 @@ const apiMock = vi.hoisted(() => ({
   loadProfiles: vi.fn(),
   updatePreferences: vi.fn(),
   openInVLC: vi.fn(),
-  copyText: vi.fn()
+  copyText: vi.fn(),
+  startPreview: vi.fn(),
+  stopPreview: vi.fn()
 }))
 
 vi.mock('./lib/api', () => ({ api: apiMock }))
@@ -106,7 +108,8 @@ function makeBootstrap(
   capabilities: BootstrapResult['capabilities'] = {
     demo: false,
     rtsp_playback_available: true,
-    vlc_available: false
+    vlc_available: false,
+    live_preview_available: false
   }
 ): BootstrapResult {
   return { overview, capabilities }
@@ -759,7 +762,8 @@ describe('App M3 integration', () => {
       data: makeBootstrap(makeOverview(), {
         demo: false,
         rtsp_playback_available: true,
-        vlc_available: true
+        vlc_available: true,
+        live_preview_available: false
       })
     })
     await renderReady()
@@ -822,7 +826,8 @@ describe('App M3 integration', () => {
       data: makeBootstrap(makeOverview(), {
         demo: true,
         rtsp_playback_available: false,
-        vlc_available: false
+        vlc_available: false,
+        live_preview_available: false
       })
     })
     await renderReady()
@@ -845,9 +850,50 @@ describe('App M3 integration', () => {
     expect(screen.queryByRole('button', { name: 'Open in VLC' })).toBeNull()
     expect(
       screen.getAllByText(
-        'Playback is disabled in demo mode because no real RTSP stream exists.'
+        'VLC is disabled in demo mode because no real RTSP stream exists. Live preview shows a synthetic test pattern.'
       ).length
     ).toBeGreaterThan(0)
+  })
+
+  it('starts and stops a live preview by identifiers and reports missing MSE', async () => {
+    apiMock.bootstrap.mockResolvedValue({
+      data: makeBootstrap(makeOverview(), {
+        demo: true,
+        rtsp_playback_available: false,
+        vlc_available: false,
+        live_preview_available: true
+      })
+    })
+    apiMock.startPreview.mockResolvedValue({
+      data: {
+        session_id: '0123456789abcdef0123456789abcdef',
+        url: 'http://127.0.0.1:49152/v1/sessions/0123456789abcdef0123456789abcdef',
+        token: 'synthetic-token'
+      }
+    })
+    apiMock.stopPreview.mockResolvedValue({ data: { completed: true } })
+    await renderReady()
+    await fireEvent.click(screen.getByRole('tab', { name: /Streams/ }))
+    await screen.findByRole('heading', { name: 'Profile Main stream' })
+
+    await fireEvent.click(
+      screen.getAllByRole('button', { name: 'Start live preview' })[0]
+    )
+    expect(apiMock.startPreview).toHaveBeenCalledWith(
+      'camera-front',
+      'profile_main'
+    )
+    // jsdom has no Media Source Extensions, which the player must report.
+    expect(
+      await screen.findByText(
+        'This WebView does not support Media Source Extensions, so live video cannot play here.'
+      )
+    ).toBeTruthy()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Stop preview' }))
+    expect(apiMock.stopPreview).toHaveBeenCalledWith(
+      '0123456789abcdef0123456789abcdef'
+    )
   })
 
   it('exposes labeled controls, live status, modal semantics, and keyboard focus', async () => {

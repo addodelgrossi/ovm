@@ -50,6 +50,14 @@ export function SelectDevice(arg1) {
   return window['go']['main']['App']['SelectDevice'](arg1)
 }
 
+export function StartPreview(arg1) {
+  return window['go']['main']['App']['StartPreview'](arg1)
+}
+
+export function StopPreview(arg1) {
+  return window['go']['main']['App']['StopPreview'](arg1)
+}
+
 export function UpdatePreferences(arg1) {
   return window['go']['main']['App']['UpdatePreferences'](arg1)
 }

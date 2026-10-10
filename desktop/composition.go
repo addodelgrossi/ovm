@@ -10,6 +10,8 @@ import (
 	core "github.com/addodelgrossi/ovm/internal/app"
 	"github.com/addodelgrossi/ovm/internal/demo"
 	"github.com/addodelgrossi/ovm/internal/store"
+	"github.com/addodelgrossi/ovm/internal/synthmedia"
+	"github.com/addodelgrossi/ovm/pkg/stream"
 )
 
 type desktopOptions struct {
@@ -55,6 +57,16 @@ func productionCompositionFactories() compositionFactories {
 	}
 }
 
+// demoPreviewSources serves the project-owned synthetic H.264 stream in real
+// time for every demo profile; no network or camera is involved.
+func demoPreviewSources(_ context.Context, _ Manager, _ core.StreamSelection) (stream.H264Source, func(), error) {
+	source, err := synthmedia.NewH264Source(synthmedia.H264Config{Width: 640, Height: 352, FPS: 25, GOP: 50})
+	if err != nil {
+		return nil, nil, err
+	}
+	return synthmedia.NewPacedH264(source), nil, nil
+}
+
 // composeDesktop is the sole production composition root. Normal mode opens
 // the JSON metadata repository and constructs the platform secret-provider
 // adapter without invoking Get/Put/Delete; keyring access therefore begins only
@@ -78,10 +90,11 @@ func composeDesktop(ctx context.Context, options desktopOptions, factories compo
 			return nil, fmt.Errorf("compose demo environment: %w", err)
 		}
 		host, err := NewApp(AppDependencies{
-			Manager:    manager,
-			DemoCloser: closer,
-			VLC:        launcher,
-			Demo:       true,
+			Manager:        manager,
+			DemoCloser:     closer,
+			VLC:            launcher,
+			PreviewSources: demoPreviewSources,
+			Demo:           true,
 		})
 		if err != nil {
 			if closer != nil {

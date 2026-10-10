@@ -22,6 +22,7 @@ type CapabilityFlags struct {
 	Demo                  bool `json:"demo"`
 	RTSPPlaybackAvailable bool `json:"rtsp_playback_available"`
 	VLCAvailable          bool `json:"vlc_available"`
+	LivePreviewAvailable  bool `json:"live_preview_available"`
 }
 
 type BootstrapResult struct {
@@ -124,6 +125,29 @@ type OpenInVLCRequest struct {
 	DeviceID     string `json:"device_id"`
 	ProfileToken string `json:"profile_token"`
 	Transport    string `json:"transport"`
+}
+
+type StartPreviewRequest struct {
+	DeviceID     string `json:"device_id"`
+	ProfileToken string `json:"profile_token"`
+}
+
+// StartPreviewResult tells the WebView where to fetch the fragmented MP4
+// stream. The URL is loopback-only and the token is required as a bearer
+// credential; neither carries camera credentials.
+type StartPreviewResult struct {
+	SessionID string `json:"session_id"`
+	URL       string `json:"url"`
+	Token     string `json:"token"`
+}
+
+type StartPreviewResponse struct {
+	Result *StartPreviewResult `json:"result,omitempty"`
+	Error  *BindingError       `json:"error,omitempty"`
+}
+
+type StopPreviewRequest struct {
+	SessionID string `json:"session_id"`
 }
 
 // Bootstrap loads the persisted catalog and returns immutable desktop
@@ -368,9 +392,55 @@ func (a *App) OpenInVLC(request OpenInVLCRequest) ActionResponse {
 	return ActionResponse{Result: &ActionResult{Completed: true}}
 }
 
+// StartPreview opens a live preview for a device profile. Like OpenInVLC it
+// accepts only identities; the backend resolves the stream itself.
+func (a *App) StartPreview(request StartPreviewRequest) StartPreviewResponse {
+	selection, validationErr := validateStartPreviewRequest(request)
+	if validationErr != nil {
+		return StartPreviewResponse{Error: validationErr}
+	}
+	manager, ctx, finish, bindingErr := a.beginCall()
+	if bindingErr != nil {
+		return StartPreviewResponse{Error: bindingErr}
+	}
+	defer finish()
+
+	a.mu.Lock()
+	previews := a.previews
+	root := a.rootCtx
+	a.mu.Unlock()
+	if !previews.available() || root == nil {
+		return StartPreviewResponse{Error: bindingUnavailable("preview_unavailable", "live preview is unavailable")}
+	}
+	result, err := previews.start(ctx, root, manager, selection)
+	if err != nil {
+		return StartPreviewResponse{Error: bindingErrorFrom(err)}
+	}
+	return StartPreviewResponse{Result: result}
+}
+
+// StopPreview ends a preview session. Stopping an unknown or finished session
+// is not an error.
+func (a *App) StopPreview(request StopPreviewRequest) ActionResponse {
+	if !validPreviewSessionID(request.SessionID) {
+		return ActionResponse{Error: bindingValidation("invalid_session_id", "the preview session identifier is not valid")}
+	}
+	a.mu.Lock()
+	previews := a.previews
+	a.mu.Unlock()
+	if previews == nil {
+		return ActionResponse{Error: bindingUnavailable("app_closed", "the desktop application is closed")}
+	}
+	previews.stop(request.SessionID)
+	return ActionResponse{Result: &ActionResult{Completed: true}}
+}
+
 func bindingErrorFrom(err error) *BindingError {
 	if err == nil {
 		return nil
+	}
+	if errors.Is(err, errPreviewLimit) {
+		return &BindingError{Category: core.CategoryUsage, Code: "preview_limit", Message: "at most four previews can run at once"}
 	}
 	var managerErr *core.ManagerError
 	if errors.As(err, &managerErr) {

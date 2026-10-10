@@ -9,6 +9,7 @@
   } from '../lib/i18n'
   import type { AppState } from '../lib/state.svelte'
   import CopyButton from './CopyButton.svelte'
+  import LivePreview from './LivePreview.svelte'
 
   let { model, device }: { model: AppState; device: Device } = $props()
 
@@ -336,6 +337,15 @@
                 {/if}
               </div>
             </div>
+
+            {#if model.capabilities.live_preview_available && profile.stream?.tcp_uri}
+              <LivePreview
+                locale={model.locale}
+                deviceId={device.id}
+                profileToken={profile.token}
+                profileName={profileName(profile)}
+              />
+            {/if}
 
             {#if model.capabilities.demo}
               <div class="notice notice-demo">

@@ -41,6 +41,14 @@ export function SelectDevice(
   arg1: main.DeviceIDRequest
 ): Promise<main.OverviewResponse>
 
+export function StartPreview(
+  arg1: main.StartPreviewRequest
+): Promise<main.StartPreviewResponse>
+
+export function StopPreview(
+  arg1: main.StopPreviewRequest
+): Promise<main.ActionResponse>
+
 export function UpdatePreferences(
   arg1: main.UpdatePreferencesRequest
 ): Promise<main.OverviewResponse>

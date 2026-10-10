@@ -1,6 +1,6 @@
 # ovm v0.1.0 Implementation Plan
 
-Status: **M3 — Base Desktop Application in progress**
+Status: **M3 — Desktop Base complete; M4 — Video next**
 Last updated: 2026-10-10
 
 ## Product goal
@@ -123,7 +123,7 @@ available and always report method and uncertainty. A result is
 | M0 Foundation | Complete | Repository, docs, ADR 0001, license, minimal CLI/desktop, CI | Passed locally and in GitHub Actions on macOS/Ubuntu |
 | M1 ONVIF Core + CLI | Complete | SOAP, auth, discovery, Device info, fake device, `discover`/`info` | Passed locally and in GitHub Actions on macOS/Ubuntu |
 | M2 Media | Complete | Media/Media2 reads, URLs, snapshots, `profiles`/`snapshot` | Passed locally and in GitHub Actions on macOS/Ubuntu |
-| M3 Desktop Base | In progress | Wails UI, persistence, Keychain, sidebar, Overview, Streams, demo | Discover and copy RTSP end to end |
+| M3 Desktop Base | Complete | Wails UI, persistence, Keychain, sidebar, Overview, Streams, demo | Discover and copy RTSP end to end |
 | M4 Video | Planned | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
 | M5 Configuration | Planned | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |
 | M6 Diagnostics | Planned | SOAP console, Events, clock/stability, reports, Quick Setup, palette | Complete redacted reports |
@@ -189,9 +189,10 @@ Current work: the versioned metadata store, Keychain/Secret Service providers
 with a compensating coordinator, host-interface enumeration, `app.Manager`, the
 Wails composition and typed binding envelopes, the isolated `--demo`
 environment, and the sidebar, Overview, and Streams UI with copy actions, VLC
-launch, themes, and English/pt-BR are implemented and pass local tests. M3
-remains **In progress** until the remote CI gate passes and the exit gate is
-exercised in the native app in demo mode. Known limits: the app cannot detect
+launch, themes, and English/pt-BR are implemented. Local and remote CI pass
+on macOS and Ubuntu, and the exit gate was exercised in the native macOS app in
+demo mode: scan, select, authenticate, and copy a credential-free RTSP URL.
+Known limits: the app cannot detect
 that macOS denied Local Network permission, so diagnostics give honest generic
 guidance and point to manual add; evidence is synthetic-fixture only.
 

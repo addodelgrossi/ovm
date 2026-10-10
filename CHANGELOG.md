@@ -224,7 +224,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-- M0, M1, and M2 are complete. M3 implementation and local synthetic-fixture
-  validation are complete; M3 remains in progress until remote CI passes. No
+- M0, M1, M2, and M3 are complete, validated locally, in remote CI, and (for
+  M3) in the native app in demo mode. No
   physical camera has been verified, and no hardware or conformance claim is
   made.

@@ -147,7 +147,13 @@ func (d *Device) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 	// The dispatched action is always the validated body operation action.
 	action = bodyAction
 	d.recordRequest(RequestRecord{Version: version, Action: safeAction(action)})
-	if d.cfg().RequireUsernameToken && !d.validateUsernameToken(usernameTokenFromEnvelope(envelope)) {
+	// GetSystemDateAndTime is a pre-authentication operation in the ONVIF
+	// access policy: clients read the camera clock before building a
+	// UsernameToken, so a request with no security header at all is
+	// answered. Any security header that is present is still validated.
+	noSecurity := envelope.Header == nil || envelope.Header.Security == nil
+	preAuthClock := action == ActionGetSystemDateAndTime && noSecurity
+	if d.cfg().RequireUsernameToken && !preAuthClock && !d.validateUsernameToken(usernameTokenFromEnvelope(envelope)) {
 		d.writeFault(response, version, FaultSpec{Kind: FaultNotAuthorized, Reason: "UsernameToken authentication failed"})
 		return
 	}

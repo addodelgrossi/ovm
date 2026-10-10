@@ -63,8 +63,9 @@ The host-scoped commands accept a host, `host:port`, or full `http(s)://` Device
 service URL. `profiles` reports every profile in deterministic token order,
 including Media1/Media2 provenance, codec, resolution, frame rate, bitrate, GOP,
 and presentation-safe RTSP TCP/UDP and snapshot URIs. Displayed URIs never
-contain userinfo, query, or fragment components and are not operational
-credential-bearing forms.
+contain userinfo or fragment components. RTSP URIs keep the camera's query,
+because cameras commonly select the channel or substream with it (for example
+`?channel=1&subtype=0`); snapshot URIs are shown without a query.
 
 `snapshot` writes JPEG bytes only to the named file and reports credential-free
 metadata to stdout. When `--profile` is omitted, it selects the
@@ -97,7 +98,8 @@ interface, and suppresses stale Hello/Bye notifications using AppSequence.
 Every URL-bearing field is validated and redacted at the application boundary.
 Device/discovery presentation fields remove userinfo, query, and fragment;
 Media presentation URIs additionally enforce camera-origin/host and supported
-scheme rules before their query is stripped. Operational Media service and
+scheme rules; RTSP stream URIs keep their query exactly as the camera returned
+it, while snapshot URIs have it stripped. Operational Media service and
 snapshot URLs retain required paths and queries only inside the authenticated
 use case and never cross into DTOs, CLI output, errors, or fake-device request
 history. URI paths and opaque identity content remain visible and are not

@@ -719,8 +719,7 @@ describe('App M3 integration', () => {
     expect(screen.getByText('PCMU')).toBeTruthy()
     expect(screen.getAllByText(/Media1 fallback/).length).toBeGreaterThan(0)
     expect(
-      screen.getAllByText(/intentionally omit credentials and query parameters/)
-        .length
+      screen.getAllByText(/intentionally omit credentials\./).length
     ).toBeGreaterThan(0)
     expect(screen.getByText('rtsp://192.0.2.10/main-tcp')).toBeTruthy()
     expect(

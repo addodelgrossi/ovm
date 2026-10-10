@@ -29,7 +29,7 @@ exported device methods return result/error envelopes with a stable
 `BindingError` (`category`, `code`, and safe English `message`). Authentication
 passwords are accepted only in the request, are never included in a response or
 log, and are not retained by the host. `OpenInVLC` accepts only a device ID,
-profile token, and transport; the Manager re-resolves a query-free,
+profile token, and transport; the Manager re-resolves a
 credential-free RTSP URI and the host starts only an allowlisted VLC executable
 without a shell.
 

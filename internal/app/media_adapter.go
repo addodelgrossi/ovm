@@ -387,5 +387,18 @@ func stripURIForPresentation(parsed *url.URL) string {
 	return clone.String()
 }
 
+// stripStreamURIForPresentation removes userinfo and fragment but keeps the
+// query: many cameras select the channel or substream with query parameters
+// (for example "?channel=1&subtype=0"), so a query-free RTSP URI would not
+// play. The query is shown and copied exactly as the camera returned it.
+func stripStreamURIForPresentation(parsed *url.URL) string {
+	clone := *parsed
+	clone.User = nil
+	clone.ForceQuery = false
+	clone.Fragment = ""
+	clone.RawFragment = ""
+	return clone.String()
+}
+
 // hostnameEqual reports whether two hostnames are equal case-insensitively.
 func hostnameEqual(a, b string) bool { return strings.EqualFold(a, b) }

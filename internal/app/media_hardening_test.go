@@ -176,14 +176,16 @@ func TestValidateStreamURIRejections(t *testing.T) {
 		}
 	}
 	// An rtsp URI on a non-default RTSP port with a query is accepted and the
-	// query is stripped from the presentation value.
-	safe, err := r.validateStreamURI("rtsp://cam.local:8554/stream?session=synthetic")
+	// query is preserved: cameras select channels and substreams with it.
+	safe, err := r.validateStreamURI("rtsp://cam.local:8554/cam/realmonitor?channel=1&subtype=0")
 	if err != nil {
 		t.Fatalf("valid rtsp URI rejected: %v", err)
 	}
-	assertNoQuery(t, safe)
-	if !strings.HasPrefix(safe, "rtsp://cam.local:8554/stream") {
-		t.Fatalf("safe stream URI = %q, want host/port/path preserved", safe)
+	if safe != "rtsp://cam.local:8554/cam/realmonitor?channel=1&subtype=0" {
+		t.Fatalf("safe stream URI = %q, want host/port/path/query preserved", safe)
+	}
+	if _, err := r.validateStreamURI("rtsp://cam.local:554/s?x=%01"); err == nil {
+		t.Error("validateStreamURI accepted an encoded control character in the query")
 	}
 }
 

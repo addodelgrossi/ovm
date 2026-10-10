@@ -137,7 +137,7 @@ XML, or UI types.
   (`category`, `code`, safe English `message`) and bound every call with the
   host's root context. Passwords are accepted only in a request and never
   returned or logged. `OpenInVLC` accepts identifiers only; the manager
-  re-resolves a credential-free, query-free RTSP URI and the host launches an
+  re-resolves a credential-free RTSP URI and the host launches an
   allowlisted VLC executable without a shell.
 - The Svelte frontend calls the backend only through `lib/api.ts`. Copy actions
   use the native Wails clipboard first and the web clipboard as a fallback.
@@ -158,8 +158,10 @@ XML, or UI types.
 - Advertised Media endpoints are validated against the camera origin before any
   credential or UsernameToken is applied. Duplicate or unsafe service
   advertisements fail closed. Operational endpoint and snapshot queries remain
-  private to the session; presentation RTSP and snapshot URIs are separately
-  validated and query-free.
+  private to the session. Presentation snapshot URIs are query-free.
+  Presentation RTSP URIs keep the camera's query, which commonly selects the
+  channel or substream; they never carry userinfo or a fragment, and a query
+  with an encoded control character is rejected.
 - Snapshot selection uses an explicit token or the lexicographically smallest
   non-empty token returned by the preferred service. Explicit tokens are
   validated before endpoint preparation or network I/O: valid UTF-8, 1–64

@@ -727,7 +727,7 @@ func (r *profileResolver) validateStreamURI(raw string) (string, error) {
 	if urlHasDecodedControl(parsed) {
 		return "", usageError("the stream URI is not valid")
 	}
-	return stripURIForPresentation(parsed), nil
+	return stripStreamURIForPresentation(parsed), nil
 }
 
 // validateSnapshotPresentationURI enforces that a snapshot URI is an absolute

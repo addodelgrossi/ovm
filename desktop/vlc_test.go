@@ -99,7 +99,7 @@ func TestProductionVLCLauncherRejectsUnsafeURIAndRedactsProcessFailure(t *testin
 	for _, unsafe := range []string{
 		"https://camera.example/live",
 		"rtsp://user:password@camera.example/live",
-		"rtsp://camera.example/live?credential=value",
+		"rtsp://camera.example/live?channel=%0Aoption",
 		"rtsp://camera.example/live#fragment",
 		"rtsp://camera.example/live%0Aoption",
 		"--help",

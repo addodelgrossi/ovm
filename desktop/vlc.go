@@ -115,14 +115,18 @@ func safeVLCArgument(raw string) bool {
 	if !strings.EqualFold(parsed.Scheme, "rtsp") && !strings.EqualFold(parsed.Scheme, "rtsps") {
 		return false
 	}
-	if parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || parsed.RawFragment != "" {
+	if parsed.User != nil || parsed.Fragment != "" || parsed.RawFragment != "" {
 		return false
 	}
 	decodedPath, err := url.PathUnescape(parsed.EscapedPath())
 	if err != nil {
 		return false
 	}
-	for _, character := range decodedPath {
+	decodedQuery, err := url.QueryUnescape(parsed.RawQuery)
+	if err != nil {
+		return false
+	}
+	for _, character := range decodedPath + decodedQuery {
 		if character < 0x20 || character == 0x7f {
 			return false
 		}

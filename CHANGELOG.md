@@ -114,6 +114,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Presentation RTSP URIs (CLI `profiles`, desktop Streams, copy actions, and VLC
+  launch) now keep the camera's query exactly as returned, because cameras such
+  as `?channel=1&subtype=0` endpoints select the channel or substream with it.
+  Userinfo and fragments are still rejected, an encoded control character in
+  the query fails closed, and snapshot URIs remain query-free.
 - Snapshot retrieval now selects the lexicographically smallest non-empty
   profile token in the same authenticated session when no token is supplied.
   Destination validation happens before network I/O; publication is atomic and

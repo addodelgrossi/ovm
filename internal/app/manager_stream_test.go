@@ -99,8 +99,12 @@ func TestResolveStreamURIFailsClosedOnUnsafeOrUnsupportedDTO(t *testing.T) {
 		profile MediaProfileDTO
 	}{
 		{
-			name:    "query",
-			profile: supportedStreamProfile("profile_main", "rtsp://192.168.44.12/main?token=secret", ""),
+			name:    "userinfo",
+			profile: supportedStreamProfile("profile_main", "rtsp://user:pass@192.168.44.12/main", ""),
+		},
+		{
+			name:    "encoded control in query",
+			profile: supportedStreamProfile("profile_main", "rtsp://192.168.44.12/main?x=%0A", ""),
 		},
 		{
 			name:    "different host",

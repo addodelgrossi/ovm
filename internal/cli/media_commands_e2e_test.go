@@ -93,8 +93,11 @@ func TestProfilesCLIEndToEndMediaServices(t *testing.T) {
 			if envelope.Result.Profiles[0].Source != test.wantSource {
 				t.Fatalf("source = %q, want %q", envelope.Result.Profiles[0].Source, test.wantSource)
 			}
-			if strings.Contains(stdout, "operational-query-marker") || strings.Contains(stdout, "?profile=") {
-				t.Fatalf("profiles output leaked an operational query: %s", stdout)
+			if strings.Contains(stdout, "operational-query-marker") {
+				t.Fatalf("profiles output leaked an operational endpoint query: %s", stdout)
+			}
+			if !strings.Contains(stdout, "?profile=profile_main") {
+				t.Fatalf("profiles output dropped the stream URI query: %s", stdout)
 			}
 			if test.partial {
 				status := findMediaStatus(envelope.Result.Profiles[0], app.MediaOpVideoEncoder)

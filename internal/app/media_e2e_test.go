@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/addodelgrossi/ovm/internal/fakedevice"
@@ -129,12 +130,13 @@ func TestMediaProfilesFullMedia2(t *testing.T) {
 	if main.Audio == nil || main.Audio.Codec != "PCMU" || main.Audio.BitrateKbps != 64 || main.Audio.SampleRateKHz != 8 {
 		t.Fatalf("audio summary = %+v", main.Audio)
 	}
-	// Stream and snapshot URIs present and query-stripped.
+	// Stream URIs keep the camera's query; the snapshot URI is query-stripped.
 	if main.Stream == nil || main.Stream.TCPURI == "" || main.Stream.UDPURI == "" {
 		t.Fatalf("stream URIs missing: %+v", main.Stream)
 	}
-	assertNoQuery(t, main.Stream.TCPURI)
-	assertNoQuery(t, main.Stream.UDPURI)
+	if !strings.Contains(main.Stream.TCPURI, "?profile=profile_main") || !strings.Contains(main.Stream.UDPURI, "?profile=profile_main") {
+		t.Fatalf("stream URIs lost the camera query: %+v", main.Stream)
+	}
 	if main.Snapshot == nil || main.Snapshot.URI == "" {
 		t.Fatalf("snapshot URI missing")
 	}

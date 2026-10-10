@@ -26,8 +26,8 @@ type StreamSelection struct {
 }
 
 // ResolveStreamURI re-resolves media profiles through the authenticated
-// backend and returns the selected query-free, credential-free presentation
-// URI for immediate trusted backend use. The URI must never be returned from a
+// backend and returns the selected credential-free presentation URI, with the
+// camera's query preserved, for immediate trusted backend use. The URI must never be returned from a
 // Wails response; the desktop host consumes it directly as a process argument.
 func (m *Manager) ResolveStreamURI(ctx context.Context, selection StreamSelection) (string, error) {
 	if err := m.ensureOpen(); err != nil {
@@ -94,7 +94,8 @@ func profileOperationSupported(profile MediaProfileDTO, operation MediaOperation
 // The media adapter already performs this validation while building its DTO;
 // repeating the critical properties here ensures an external process can only
 // receive an absolute RTSP(S) URI for the selected camera, with no userinfo,
-// query, fragment, or encoded control character.
+// fragment, or encoded control character. The query is allowed because
+// cameras use it to select channels and substreams.
 func safeResolvedStreamURI(deviceEndpoint, streamURI string) bool {
 	if streamURI == "" || containsControl(streamURI) {
 		return false
@@ -110,7 +111,7 @@ func safeResolvedStreamURI(deviceEndpoint, streamURI string) bool {
 	if parsed.Scheme != "rtsp" && parsed.Scheme != "rtsps" {
 		return false
 	}
-	if parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || parsed.RawFragment != "" {
+	if parsed.User != nil || parsed.Fragment != "" || parsed.RawFragment != "" {
 		return false
 	}
 	if !hostnameEqual(parsed.Hostname(), camera.Hostname()) || urlHasDecodedControl(parsed) {

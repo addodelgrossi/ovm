@@ -198,7 +198,7 @@ export const en = {
   'streams.noAudio': 'No audio encoder details were reported.',
   'streams.urls': 'Safe presentation URLs',
   'streams.safeUrlNotice':
-    'URLs shown by ovm intentionally omit credentials and query parameters. They may require authentication in the receiving application.',
+    'URLs shown by ovm intentionally omit credentials. They may require authentication in the receiving application.',
   'streams.tcp': 'RTSP over TCP',
   'streams.udp': 'RTSP over UDP',
   'streams.snapshot': 'Snapshot',
@@ -495,7 +495,7 @@ export const ptBR: Record<TranslationKey, string> = {
   'streams.noAudio': 'Nenhum detalhe do codificador de áudio foi informado.',
   'streams.urls': 'URLs seguras para apresentação',
   'streams.safeUrlNotice':
-    'As URLs exibidas pelo ovm omitem intencionalmente credenciais e parâmetros de consulta. Elas podem exigir autenticação no aplicativo receptor.',
+    'As URLs exibidas pelo ovm omitem intencionalmente as credenciais. Elas podem exigir autenticação no aplicativo receptor.',
   'streams.tcp': 'RTSP sobre TCP',
   'streams.udp': 'RTSP sobre UDP',
   'streams.snapshot': 'Captura',

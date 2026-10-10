@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -24,7 +25,9 @@ type RequestRecord struct {
 
 // Device is a race-safe, stateful fake ONVIF HTTP handler.
 type Device struct {
-	config normalizedConfig
+	// current holds the active configuration. Mutating operations publish a
+	// modified copy, so a reader always sees one consistent version.
+	current atomic.Pointer[normalizedConfig]
 
 	mu                sync.RWMutex
 	state             map[string]string
@@ -44,13 +47,13 @@ func New(config Config) (*Device, error) {
 		return nil, err
 	}
 	device := &Device{
-		config:            normalized,
 		state:             cloneStringMap(normalized.InitialState),
 		faults:            cloneFaultMap(normalized.Faults),
 		unsupported:       cloneBoolMap(normalized.UnsupportedActions),
 		seenUsernameNonce: make(map[string]time.Time),
 		digestNC:          make(map[string]uint64),
 	}
+	device.current.Store(&normalized)
 	// A Digest nonce is only required when HTTP Digest authentication is
 	// active. Generating one unconditionally would waste entropy and imply a
 	// challenge the device never issues.
@@ -66,6 +69,9 @@ func New(config Config) (*Device, error) {
 	}
 	return device, nil
 }
+
+// cfg returns the active configuration. Callers must not modify it.
+func (d *Device) cfg() *normalizedConfig { return d.current.Load() }
 
 // ServeHTTP handles a bounded SOAP request, or the authenticated JPEG snapshot
 // GET endpoint. The snapshot endpoint shares the HTTP authentication policy
@@ -86,7 +92,7 @@ func (d *Device) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 		response.WriteHeader(http.StatusUnsupportedMediaType)
 		return
 	}
-	if !d.config.supported[version] {
+	if !d.cfg().supported[version] {
 		d.recordRequest(RequestRecord{Version: version, Action: safeAction(action)})
 		d.rejectVersion(response, version)
 		return
@@ -97,7 +103,7 @@ func (d *Device) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 	defer func() {
 		_ = request.Body.Close()
 	}()
-	body, tooLarge, err := readRequestBody(request.Body, d.config.MaxRequestBytes)
+	body, tooLarge, err := readRequestBody(request.Body, d.cfg().MaxRequestBytes)
 	if err != nil {
 		response.WriteHeader(http.StatusBadRequest)
 		return
@@ -130,7 +136,7 @@ func (d *Device) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 	// The dispatched action is always the validated body operation action.
 	action = bodyAction
 	d.recordRequest(RequestRecord{Version: version, Action: safeAction(action)})
-	if d.config.RequireUsernameToken && !d.validateUsernameToken(usernameTokenFromEnvelope(envelope)) {
+	if d.cfg().RequireUsernameToken && !d.validateUsernameToken(usernameTokenFromEnvelope(envelope)) {
 		d.writeFault(response, version, FaultSpec{Kind: FaultNotAuthorized, Reason: "UsernameToken authentication failed"})
 		return
 	}
@@ -170,20 +176,20 @@ func (d *Device) ServeHTTP(response http.ResponseWriter, request *http.Request) 
 func (d *Device) dispatch(response http.ResponseWriter, request *http.Request, version SOAPVersion, action string, operation operationWire, requestData mediaRequest) {
 	switch action {
 	case ActionGetSystemDateAndTime:
-		now := d.config.Clock().Add(d.config.ClockSkew)
-		d.writeSuccess(response, version, buildSystemDateAndTime(d.config, now))
+		now := d.cfg().Clock().Add(d.cfg().ClockSkew)
+		d.writeSuccess(response, version, buildSystemDateAndTime(*d.cfg(), now))
 	case ActionGetDeviceInformation:
-		d.writeSuccess(response, version, buildGetDeviceInformation(d.config))
+		d.writeSuccess(response, version, buildGetDeviceInformation(*d.cfg()))
 	case ActionGetCapabilities:
-		d.writeSuccess(response, version, buildGetCapabilities(d.config))
+		d.writeSuccess(response, version, buildGetCapabilities(*d.cfg()))
 	case ActionGetServices:
-		d.writeSuccess(response, version, buildGetServices(d.config))
+		d.writeSuccess(response, version, buildGetServices(*d.cfg()))
 	case ActionGetScopes:
-		d.writeSuccess(response, version, buildGetScopes(d.config))
+		d.writeSuccess(response, version, buildGetScopes(*d.cfg()))
 	case ActionGetHostname:
-		d.writeSuccess(response, version, buildGetHostname(d.config))
+		d.writeSuccess(response, version, buildGetHostname(*d.cfg()))
 	case ActionGetNetworkInterfaces:
-		d.writeSuccess(response, version, buildGetNetworkInterfaces(d.config))
+		d.writeSuccess(response, version, buildGetNetworkInterfaces(*d.cfg()))
 	case ActionGetState:
 		stateRequest, parseErr := parseStateOperation(operation)
 		if parseErr != nil {
@@ -191,7 +197,7 @@ func (d *Device) dispatch(response http.ResponseWriter, request *http.Request, v
 			return
 		}
 		value, present := d.State(stateRequest.Key)
-		d.writeSuccess(response, version, buildGetState(d.config, stateRequest.Key, value, present))
+		d.writeSuccess(response, version, buildGetState(*d.cfg(), stateRequest.Key, value, present))
 	case ActionSetState:
 		stateRequest, parseErr := parseStateOperation(operation)
 		if parseErr != nil {
@@ -199,7 +205,7 @@ func (d *Device) dispatch(response http.ResponseWriter, request *http.Request, v
 			return
 		}
 		d.SetState(stateRequest.Key, stateRequest.Value)
-		d.writeSuccess(response, version, buildSetState(d.config))
+		d.writeSuccess(response, version, buildSetState(*d.cfg()))
 	default:
 		d.dispatchMedia(response, request, version, action, requestData)
 	}
@@ -209,34 +215,34 @@ func (d *Device) dispatch(response http.ResponseWriter, request *http.Request, v
 // ver10 or ver20 action. Stream and snapshot URIs are derived from the live
 // request origin so they always point back at the serving host.
 func (d *Device) dispatchMedia(response http.ResponseWriter, request *http.Request, version SOAPVersion, action string, requestData mediaRequest) {
-	if !mediaReferencesExist(d.config.MediaInventory, action, requestData) {
+	if !mediaReferencesExist(d.cfg().MediaInventory, action, requestData) {
 		d.writeFault(response, version, FaultSpec{Kind: FaultInvalidArgVal, Reason: "Unknown media reference token"})
 		return
 	}
 	origin := originFromRequest(request)
-	snapshotPath := d.config.MediaInventory.SnapshotPath
-	snapshotQuery := d.config.MediaInventory.SnapshotQuery
-	streamPath := d.config.MediaInventory.StreamPath
-	rtspPort := d.config.MediaInventory.RTSPPort
+	snapshotPath := d.cfg().MediaInventory.SnapshotPath
+	snapshotQuery := d.cfg().MediaInventory.SnapshotQuery
+	streamPath := d.cfg().MediaInventory.StreamPath
+	rtspPort := d.cfg().MediaInventory.RTSPPort
 	switch action {
 	case ActionMedia1GetProfiles:
-		d.writeMediaSuccess(response, version, mediaVer10, buildMediaProfiles(d.config, mediaVer10, requestData))
+		d.writeMediaSuccess(response, version, mediaVer10, buildMediaProfiles(*d.cfg(), mediaVer10, requestData))
 	case ActionMedia2GetProfiles:
-		d.writeMediaSuccess(response, version, mediaVer20, buildMediaProfiles(d.config, mediaVer20, requestData))
+		d.writeMediaSuccess(response, version, mediaVer20, buildMediaProfiles(*d.cfg(), mediaVer20, requestData))
 	case ActionMedia1GetVideoSources:
-		d.writeMediaSuccess(response, version, mediaVer10, buildVideoSources(d.config))
+		d.writeMediaSuccess(response, version, mediaVer10, buildVideoSources(*d.cfg()))
 	case ActionMedia1GetVideoEncoderConfigurations:
-		d.writeMediaSuccess(response, version, mediaVer10, buildVideoEncoderConfigurations(d.config, mediaVer10, requestData))
+		d.writeMediaSuccess(response, version, mediaVer10, buildVideoEncoderConfigurations(*d.cfg(), mediaVer10, requestData))
 	case ActionMedia2GetVideoEncoderConfigurations:
-		d.writeMediaSuccess(response, version, mediaVer20, buildVideoEncoderConfigurations(d.config, mediaVer20, requestData))
+		d.writeMediaSuccess(response, version, mediaVer20, buildVideoEncoderConfigurations(*d.cfg(), mediaVer20, requestData))
 	case ActionMedia1GetVideoEncoderConfigurationOptions:
-		d.writeMediaSuccess(response, version, mediaVer10, buildVideoEncoderOptions(d.config, mediaVer10))
+		d.writeMediaSuccess(response, version, mediaVer10, buildVideoEncoderOptions(*d.cfg(), mediaVer10))
 	case ActionMedia2GetVideoEncoderConfigurationOptions:
-		d.writeMediaSuccess(response, version, mediaVer20, buildVideoEncoderOptions(d.config, mediaVer20))
+		d.writeMediaSuccess(response, version, mediaVer20, buildVideoEncoderOptions(*d.cfg(), mediaVer20))
 	case ActionMedia1GetAudioEncoderConfigurations:
-		d.writeMediaSuccess(response, version, mediaVer10, buildAudioEncoderConfigurations(d.config, mediaVer10, requestData))
+		d.writeMediaSuccess(response, version, mediaVer10, buildAudioEncoderConfigurations(*d.cfg(), mediaVer10, requestData))
 	case ActionMedia2GetAudioEncoderConfigurations:
-		d.writeMediaSuccess(response, version, mediaVer20, buildAudioEncoderConfigurations(d.config, mediaVer20, requestData))
+		d.writeMediaSuccess(response, version, mediaVer20, buildAudioEncoderConfigurations(*d.cfg(), mediaVer20, requestData))
 	case ActionMedia1GetStreamURI:
 		d.writeMediaSuccess(response, version, mediaVer10, buildStreamURIResponse(mediaVer10, origin, streamPath, rtspPort, requestData))
 	case ActionMedia2GetStreamURI:
@@ -280,7 +286,7 @@ func mediaReferencesExist(inventory MediaInventory, action string, request media
 // comparison is on the exact configured path so an unrelated GET falls through
 // to the method-not-allowed branch.
 func (d *Device) isSnapshotPath(path string) bool {
-	return path == d.config.MediaInventory.SnapshotPath
+	return path == d.cfg().MediaInventory.SnapshotPath
 }
 
 // serveSnapshot serves the synthetic JPEG under the HTTP authentication policy.
@@ -295,9 +301,9 @@ func (d *Device) serveSnapshot(response http.ResponseWriter, request *http.Reque
 		return
 	}
 	response.Header().Set("Content-Type", "image/jpeg")
-	response.Header().Set("Content-Length", strconv.Itoa(len(d.config.JPEGSnapshot)))
+	response.Header().Set("Content-Length", strconv.Itoa(len(d.cfg().JPEGSnapshot)))
 	response.WriteHeader(http.StatusOK)
-	_, _ = response.Write(d.config.JPEGSnapshot)
+	_, _ = response.Write(d.cfg().JPEGSnapshot)
 }
 
 // snapshotRecordAction labels snapshot GETs in the credential-free request
@@ -373,7 +379,7 @@ func (d *Device) validateUsernameToken(token *usernameTokenWire) bool {
 	// valid RFC3339 lexical value, so unlike display-oriented fields it is not
 	// whitespace-trimmed or re-serialized before parsing and hashing.
 	createdText := token.Created.Value
-	if !secureEqual(username, d.config.Username) || passwordDigest == "" || nonceText == "" || createdText == "" {
+	if !secureEqual(username, d.cfg().Username) || passwordDigest == "" || nonceText == "" || createdText == "" {
 		return false
 	}
 	if token.Password.Type != passwordDigestURI || token.Nonce.EncodingType != base64BinaryURI {
@@ -383,26 +389,26 @@ func (d *Device) validateUsernameToken(token *usernameTokenWire) bool {
 	if err != nil || len(rawNonce) < 16 {
 		return false
 	}
-	created, ok := parseUsernameTokenCreated(createdText, d.config.UsernameTokenStrictCreated)
+	created, ok := parseUsernameTokenCreated(createdText, d.cfg().UsernameTokenStrictCreated)
 	if !ok {
 		return false
 	}
-	deviceNow := d.config.Clock().Add(d.config.ClockSkew).UTC()
+	deviceNow := d.cfg().Clock().Add(d.cfg().ClockSkew).UTC()
 	difference := deviceNow.Sub(created)
 	if difference < 0 {
 		difference = -difference
 	}
-	if difference > d.config.UsernameTokenWindow {
+	if difference > d.cfg().UsernameTokenWindow {
 		return false
 	}
 
 	// PasswordDigest = Base64( SHA1( nonce + createdBytes + password ) ), using
 	// the exact transmitted Created bytes so a semantically valid offset or
 	// fractional-second timestamp verifies against the digest the client built.
-	digestInput := make([]byte, 0, len(rawNonce)+len(createdText)+len(d.config.Password))
+	digestInput := make([]byte, 0, len(rawNonce)+len(createdText)+len(d.cfg().Password))
 	digestInput = append(digestInput, rawNonce...)
 	digestInput = append(digestInput, createdText...)
-	digestInput = append(digestInput, d.config.Password...)
+	digestInput = append(digestInput, d.cfg().Password...)
 	digest := sha1.Sum(digestInput) // #nosec G401 -- mandated by the WS-Security PasswordDigest formula.
 	expected := base64.StdEncoding.EncodeToString(digest[:])
 	if subtle.ConstantTimeCompare([]byte(passwordDigest), []byte(expected)) != 1 {
@@ -412,13 +418,13 @@ func (d *Device) validateUsernameToken(token *usernameTokenWire) bool {
 	nonceKey := base64.StdEncoding.EncodeToString(rawNonce)
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	cutoff := deviceNow.Add(-d.config.UsernameTokenWindow)
+	cutoff := deviceNow.Add(-d.cfg().UsernameTokenWindow)
 	for seenNonce, seenAt := range d.seenUsernameNonce {
 		if seenAt.Before(cutoff) {
 			delete(d.seenUsernameNonce, seenNonce)
 		}
 	}
-	if _, replayed := d.seenUsernameNonce[nonceKey]; replayed || len(d.seenUsernameNonce) >= d.config.MaxAuthStateEntries {
+	if _, replayed := d.seenUsernameNonce[nonceKey]; replayed || len(d.seenUsernameNonce) >= d.cfg().MaxAuthStateEntries {
 		return false
 	}
 	d.seenUsernameNonce[nonceKey] = deviceNow
@@ -448,7 +454,7 @@ func parseUsernameTokenCreated(createdText string, strict bool) (time.Time, bool
 }
 
 func (d *Device) rejectVersion(response http.ResponseWriter, version SOAPVersion) {
-	if d.config.VersionRejection == RejectWithVersionMismatch {
+	if d.cfg().VersionRejection == RejectWithVersionMismatch {
 		d.writeFault(response, version, FaultSpec{Kind: FaultVersionMismatch, Reason: "SOAP version is not supported"})
 		return
 	}
@@ -458,7 +464,7 @@ func (d *Device) rejectVersion(response http.ResponseWriter, version SOAPVersion
 func (d *Device) writeSuccess(response http.ResponseWriter, version SOAPVersion, payload string) {
 	setResponseContentType(response.Header(), version)
 	response.WriteHeader(http.StatusOK)
-	_, _ = io.WriteString(response, buildEnvelope(d.config, version, payload))
+	_, _ = io.WriteString(response, buildEnvelope(*d.cfg(), version, payload))
 }
 
 // writeMediaSuccess writes a media payload wrapped in an envelope that binds the
@@ -466,19 +472,19 @@ func (d *Device) writeSuccess(response http.ResponseWriter, version SOAPVersion,
 func (d *Device) writeMediaSuccess(response http.ResponseWriter, version SOAPVersion, media mediaVersion, payload string) {
 	setResponseContentType(response.Header(), version)
 	response.WriteHeader(http.StatusOK)
-	_, _ = io.WriteString(response, buildMediaEnvelope(d.config, version, media, payload))
+	_, _ = io.WriteString(response, buildMediaEnvelope(*d.cfg(), version, media, payload))
 }
 
 func (d *Device) writeFault(response http.ResponseWriter, version SOAPVersion, fault FaultSpec) {
 	setResponseContentType(response.Header(), version)
 	response.WriteHeader(http.StatusInternalServerError)
-	_, _ = io.WriteString(response, buildFault(d.config, version, fault))
+	_, _ = io.WriteString(response, buildFault(*d.cfg(), version, fault))
 }
 
 func (d *Device) recordRequest(record RequestRecord) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if len(d.requests) >= d.config.MaxRequestHistory {
+	if len(d.requests) >= d.cfg().MaxRequestHistory {
 		copy(d.requests, d.requests[1:])
 		d.requests[len(d.requests)-1] = record
 		return

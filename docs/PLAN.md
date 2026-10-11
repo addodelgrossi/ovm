@@ -1,7 +1,7 @@
 # ovm v0.1.0 Implementation Plan
 
-Status: **M5 — Configuration complete; M6 — Diagnostics implemented, native validation pending**
-Last updated: 2026-10-10
+Status: **M6 — Diagnostics complete; M7 — Distribution built, publication blocked on hardware**
+Last updated: 2026-10-11
 
 ## Product goal
 
@@ -126,7 +126,7 @@ available and always report method and uncertainty. A result is
 | M3 Desktop Base | Complete | Wails UI, persistence, Keychain, sidebar, Overview, Streams, demo | Discover and copy RTSP end to end |
 | M4 Video | Complete | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
 | M5 Configuration | Complete | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |
-| M6 Diagnostics | Implemented | SOAP console, Events, clock/stability, reports, Quick Setup, palette | Complete redacted reports |
+| M6 Diagnostics | Complete | SOAP console, Events, clock/stability, reports, Quick Setup, palette | Complete redacted reports |
 | M7 Distribution | Built; publication blocked on hardware | macOS/Linux packages, CLI releases, two-camera gate, GitHub release | Physical acceptance and green release workflow |
 
 ## Detailed milestone scope
@@ -271,8 +271,10 @@ check combines ONVIF reads with RTCP Sender Reports and reports an honest
 `uncertain` verdict. The stability test, device reports (JSON and Markdown),
 and the `clock`, `stability`, `events`, and `report` commands share the
 application layer with the desktop Diagnostics tab. Quick Setup resumes per
-device; the command palette opens with ⌘/Ctrl+K. Local `make ci` passes; the
-native macOS check in demo mode is pending.
+device; the command palette opens with ⌘/Ctrl+K. Local `make ci` and GitHub Actions
+on macOS/Ubuntu pass, and the Diagnostics tab (report export, clock check,
+stability test, events with filtering, SOAP console), Quick Setup, and the
+command palette were confirmed in the native macOS app in demo mode.
 
 ### M7 — Distribution and release
 

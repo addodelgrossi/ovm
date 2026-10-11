@@ -312,8 +312,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-- M0 through M5 are complete, validated locally, in remote CI, and (for M3,
-  M4, and M5) in the native macOS app in demo mode. M6 is implemented and
-  passes local CI; native validation is pending. M7 packaging is built and
+- M0 through M6 are complete, validated locally, in remote CI, and (for M3
+  through M6) in the native macOS app in demo mode. M7 packaging is built and
   dry-run; publishing v0.1.0 awaits the two-camera acceptance. No physical camera has been
   verified, and no hardware or conformance claim is made.

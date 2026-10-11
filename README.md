@@ -29,10 +29,11 @@ See [the implementation plan](docs/PLAN.md) and
 M1 (ONVIF core and CLI), M2 (media and snapshots), M3 (desktop base), and M4
 (video: RTSP live preview with H.264/H.265, measured statistics, reconnection,
 JPEG fallback, a four-camera grid, clip recording, and the `probe` command) are
-complete, as is M5 (verified camera configuration: encoder, image and IR cut,
-time and NTP, accounts, network, and maintenance). M6 (diagnostics: SOAP
+complete, as are M5 (verified camera configuration: encoder, image and IR cut,
+time and NTP, accounts, network, and maintenance) and M6 (diagnostics: SOAP
 console, events, clock check, stability test, device reports, Quick Setup, and
-command palette) is implemented and awaiting native validation.
+command palette). M7 (distribution) is built and dry-run; publishing v0.1.0
+awaits the two-camera acceptance.
 No physical camera has been verified.
 
 ## Commands

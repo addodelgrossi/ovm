@@ -1,0 +1,60 @@
+# GoReleaser configuration for the ovm command-line interface. The desktop
+# packages are built by the release workflow's platform jobs.
+version: 2
+
+project_name: ovm
+
+before:
+  hooks:
+    - go mod verify
+
+builds:
+  - id: ovm
+    main: ./cmd/ovm
+    binary: ovm
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/addodelgrossi/ovm/internal/buildinfo.Version={{ .Version }}
+      - -X github.com/addodelgrossi/ovm/internal/buildinfo.Commit={{ .FullCommit }}
+      - -X github.com/addodelgrossi/ovm/internal/buildinfo.Date={{ .CommitDate }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    targets:
+      - darwin_amd64
+      - darwin_arm64
+      - linux_amd64
+      - linux_arm64
+      - android_arm64
+
+archives:
+  - id: ovm
+    ids: [ovm]
+    formats: [tar.gz]
+    name_template: "ovm_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - THIRD_PARTY_NOTICES
+
+checksum:
+  name_template: "ovm_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+sboms:
+  - id: archives
+    artifacts: archive
+    documents:
+      - "{{ .ArtifactName }}.spdx.json"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot+{{ .ShortCommit }}"
+
+changelog:
+  disable: true
+
+release:
+  disable: true

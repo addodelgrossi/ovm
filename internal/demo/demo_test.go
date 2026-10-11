@@ -471,3 +471,29 @@ func TestStabilityTestPassesAgainstTheDemoStream(t *testing.T) {
 		t.Fatalf("StabilityTest() = %+v, %v", report, err)
 	}
 }
+
+// TestDeviceReportIsCompleteAndCredentialFree builds JSON and Markdown
+// reports of the demo camera.
+func TestDeviceReportIsCompleteAndCredentialFree(t *testing.T) {
+	env := newTestEnvironment(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	report, err := env.Manager().BuildReport(ctx, env.DeviceID(), app.ReportOptions{Generator: "ovm test"})
+	if err != nil {
+		t.Fatalf("BuildReport() error = %v", err)
+	}
+	if len(report.Unavailable) != 0 || report.Device.Model == "" || len(report.Profiles) == 0 ||
+		report.Imaging == nil || report.Time == nil || report.Network == nil || report.Users == nil {
+		t.Fatalf("incomplete report = %+v", report)
+	}
+	encoded, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	markdown := app.RenderReportMarkdown(report)
+	for _, output := range []string{string(encoded), markdown} {
+		if strings.Contains(output, demoPassword) {
+			t.Fatal("the report contains the camera password")
+		}
+	}
+}

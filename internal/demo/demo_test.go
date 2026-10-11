@@ -413,3 +413,31 @@ func TestImagingSwitchesIrCutToDay(t *testing.T) {
 		t.Fatalf("ApplyImaging() = %+v, %v", result, err)
 	}
 }
+
+// TestEventsDeliverSyntheticMotion subscribes through the Manager and waits
+// for the demo camera's periodic motion event.
+func TestEventsDeliverSyntheticMotion(t *testing.T) {
+	env := newTestEnvironment(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	subscription, err := env.Manager().SubscribeEvents(ctx, env.DeviceID(), "tns1:VideoSource//.")
+	if err != nil {
+		t.Fatalf("SubscribeEvents() error = %v", err)
+	}
+	defer func() { _ = subscription.Close(context.Background()) }()
+	for ctx.Err() == nil {
+		received, err := subscription.Pull(ctx)
+		if err != nil {
+			t.Fatalf("Pull() error = %v", err)
+		}
+		for _, event := range received {
+			if event.Topic != "VideoSource/MotionAlarm" {
+				t.Fatalf("filtered feed received %q", event.Topic)
+			}
+			if len(event.Data) == 1 && event.Data[0].Name == "State" && event.UTCTime != "" {
+				return
+			}
+		}
+	}
+	t.Fatal("no motion event before the deadline")
+}

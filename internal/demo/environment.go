@@ -83,6 +83,12 @@ type Runtime struct {
 // On any failure the already-bound camera is closed so no listener or goroutine
 // leaks.
 func NewEnvironment(ctx context.Context) (*Environment, error) {
+	return NewEnvironmentWith(ctx, app.ProductionOptions{})
+}
+
+// NewEnvironmentWith is NewEnvironment with production adapter options, such
+// as a SOAP console.
+func NewEnvironmentWith(ctx context.Context, options app.ProductionOptions) (*Environment, error) {
 	// The synthetic RTSP server requires the same demo credentials, so live
 	// preview exercises the production RTSP client end to end. Each request is
 	// served in the codec the fake camera currently reports for the profile,
@@ -113,22 +119,11 @@ func NewEnvironment(ctx context.Context) (*Environment, error) {
 	secrets := store.NewMemorySecretProvider()
 	repository := newMemoryRepository(secrets)
 
-	manager, err := app.NewManager(app.ManagerDependencies{
-		Repository:     repository,
-		HostInterfaces: demoHostInterfaces{},
-		Discovery:      demoDiscovery{endpoint: camera.urls.Device},
-		Inventory:      app.NewProductionInventory(),
-		Media:          app.NewProductionMediaProfiles(),
-		LiveStreams:    app.NewProductionLiveStreams(),
-		SnapshotFeeds:  app.NewProductionSnapshotFeed(),
-		Probe:          app.NewProductionProbe(),
-		Encoder:        app.NewProductionEncoder(),
-		Imaging:        app.NewProductionImaging(),
-		Time:           app.NewProductionTime(),
-		Users:          app.NewProductionUsers(),
-		Network:        app.NewProductionNetwork(),
-		Maintenance:    app.NewProductionMaintenance(),
-	})
+	dependencies := app.ProductionUseCases(options)
+	dependencies.Repository = repository
+	dependencies.HostInterfaces = demoHostInterfaces{}
+	dependencies.Discovery = demoDiscovery{endpoint: camera.urls.Device}
+	manager, err := app.NewManager(dependencies)
 	if err != nil {
 		_ = camera.Close()
 		rtsp.Close()

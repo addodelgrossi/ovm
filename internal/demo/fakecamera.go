@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 
@@ -22,7 +23,11 @@ const (
 	media2Path   = "/onvif/media2_service"
 	snapshotPath = "/onvif/snapshot"
 	imagingPath  = "/onvif/imaging_service"
+	eventsPath   = "/onvif/events_service"
 )
+
+// eventInterval paces the synthetic motion events the demo camera publishes.
+const eventInterval = 4 * time.Second
 
 // HTTP server timeouts. They are intentionally short but ample for a loopback
 // round trip, and they bound every phase of a connection so a misbehaving
@@ -51,6 +56,8 @@ type serviceURLs struct {
 	Snapshot string
 	// Imaging is the ONVIF Imaging ver20 service URL.
 	Imaging string
+	// Events is the ONVIF Events ver10 service URL.
+	Events string
 }
 
 // fakeCamera owns a loopback IPv4 listener, a same-origin fake ONVIF device,
@@ -66,6 +73,9 @@ type fakeCamera struct {
 	serveErrOnce sync.Once
 	serveErr     error
 	serveDone    chan struct{}
+
+	stopEvents chan struct{}
+	eventsDone chan struct{}
 
 	closeOnce sync.Once
 	closeErr  error
@@ -99,10 +109,12 @@ func newFakeCamera(username, password string, rtspPort int) (*fakeCamera, error)
 	}
 
 	camera := &fakeCamera{
-		device:    device,
-		listener:  listener,
-		urls:      urls,
-		serveDone: make(chan struct{}),
+		device:     device,
+		listener:   listener,
+		urls:       urls,
+		serveDone:  make(chan struct{}),
+		stopEvents: make(chan struct{}),
+		eventsDone: make(chan struct{}),
 	}
 	camera.server = &http.Server{
 		Handler:           device,
@@ -113,8 +125,38 @@ func newFakeCamera(username, password string, rtspPort int) (*fakeCamera, error)
 	}
 
 	go camera.serve()
+	go camera.publishEvents()
 
 	return camera, nil
+}
+
+// publishEvents toggles a synthetic motion alarm and, less often, a digital
+// input so the demo event feed always has traffic. It exits on stopEvents.
+func (c *fakeCamera) publishEvents() {
+	defer close(c.eventsDone)
+	ticker := time.NewTicker(eventInterval)
+	defer ticker.Stop()
+	motion := false
+	for tick := 1; ; tick++ {
+		select {
+		case <-c.stopEvents:
+			return
+		case <-ticker.C:
+		}
+		motion = !motion
+		c.device.PublishEvent(fakedevice.Event{
+			Topic:  "VideoSource/MotionAlarm",
+			Source: []fakedevice.EventItem{{Name: "Source", Value: "vsrc0"}},
+			Data:   []fakedevice.EventItem{{Name: "State", Value: strconv.FormatBool(motion)}},
+		})
+		if tick%3 == 0 {
+			c.device.PublishEvent(fakedevice.Event{
+				Topic:  "Device/Trigger/DigitalInput",
+				Source: []fakedevice.EventItem{{Name: "InputToken", Value: "input0"}},
+				Data:   []fakedevice.EventItem{{Name: "LogicalState", Value: strconv.FormatBool(tick%2 == 0)}},
+			})
+		}
+	}
 }
 
 // serve runs the single tracked serve goroutine. http.Server.Serve always
@@ -156,6 +198,7 @@ func deriveServiceURLs(addr net.Addr) (serviceURLs, error) {
 		Media2:   join(media2Path),
 		Snapshot: join(snapshotPath),
 		Imaging:  join(imagingPath),
+		Events:   join(eventsPath),
 	}, nil
 }
 
@@ -165,6 +208,8 @@ func deriveServiceURLs(addr net.Addr) (serviceURLs, error) {
 // goroutine running on return.
 func (c *fakeCamera) Shutdown(ctx context.Context) error {
 	c.closeOnce.Do(func() {
+		close(c.stopEvents)
+		<-c.eventsDone
 		shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 		defer cancel()
 
@@ -256,6 +301,12 @@ func demoDeviceConfig(urls serviceURLs, username, password string, rtspPort int)
 				{
 					Namespace:    "http://www.onvif.org/ver20/imaging/wsdl",
 					XAddr:        urls.Imaging,
+					VersionMajor: 25,
+					VersionMinor: 6,
+				},
+				{
+					Namespace:    "http://www.onvif.org/ver10/events/wsdl",
+					XAddr:        urls.Events,
 					VersionMajor: 25,
 					VersionMinor: 6,
 				},

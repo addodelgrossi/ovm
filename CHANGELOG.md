@@ -181,6 +181,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The demo camera advertises Events and publishes a synthetic motion alarm and
   digital input; its RTSP stream carries RTCP Sender Reports.
 
+- Distribution (M7): GoReleaser CLI archives for Darwin and Linux
+  (amd64/arm64) and Android arm64 with SHA-256 checksums and SPDX SBOMs, a
+  universal macOS DMG, and Ubuntu amd64/arm64 Debian packages, built by a
+  least-privilege release workflow that dry-runs on pull requests and drafts a
+  release on version tags.
+- Physical acceptance gate: a sanitized two-camera validation manifest
+  (`docs/validation/<tag>.json`) checked by `internal/tools/validationgate`
+  must pass before a release can be drafted.
+
 ### Changed
 
 - The fake device publishes configuration as atomic versions, models
@@ -305,5 +314,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - M0 through M5 are complete, validated locally, in remote CI, and (for M3,
   M4, and M5) in the native macOS app in demo mode. M6 is implemented and
-  passes local CI; native validation is pending. No physical camera has been
+  passes local CI; native validation is pending. M7 packaging is built and
+  dry-run; publishing v0.1.0 awaits the two-camera acceptance. No physical camera has been
   verified, and no hardware or conformance claim is made.

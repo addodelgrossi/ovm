@@ -127,7 +127,7 @@ available and always report method and uncertainty. A result is
 | M4 Video | Complete | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
 | M5 Configuration | Complete | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |
 | M6 Diagnostics | Implemented | SOAP console, Events, clock/stability, reports, Quick Setup, palette | Complete redacted reports |
-| M7 Distribution | Planned/blocked on hardware | macOS/Linux packages, CLI releases, two-camera gate, GitHub release | Physical acceptance and green release workflow |
+| M7 Distribution | Built; publication blocked on hardware | macOS/Linux packages, CLI releases, two-camera gate, GitHub release | Physical acceptance and green release workflow |
 
 ## Detailed milestone scope
 
@@ -282,6 +282,18 @@ native macOS check in demo mode is pending.
 - GitHub Actions-only tagged release with least-privilege permissions.
 - Mandatory two-camera physical acceptance and checked-in sanitized validation
   manifest before a release job can publish v0.1.0.
+
+Current work: everything that does not need hardware is in place. GoReleaser
+builds static CLI archives for Darwin and Linux (amd64/arm64) and Android
+arm64 with checksums and SPDX SBOMs; `scripts/package-macos.sh` builds a
+universal DMG (ad-hoc signed, or signed and notarized when Apple secrets
+exist); `scripts/package-linux.sh` builds amd64 and arm64 Debian packages that
+are installed and smoke-tested in CI. The release workflow is read-only except
+for its final job, runs as a dry run on pull requests, and on a version tag
+creates a draft release only after `internal/tools/validationgate` accepts
+`docs/validation/<tag>.json`. See [RELEASING.md](RELEASING.md). Publishing
+v0.1.0 is blocked on the two-camera acceptance and, optionally, Apple signing
+credentials.
 
 ## Test policy
 

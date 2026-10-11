@@ -209,6 +209,14 @@ Concrete socket or permission-like errors use exit 3. An explicit cancellation
 commands preserve any useful partial result already assembled; snapshot
 cancellation removes its temporary file and never emits JPEG bytes to stdout.
 
+## Installing
+
+Releases provide a universal macOS DMG (macOS 13+), Ubuntu 22.04+ Debian
+packages for amd64 and arm64 (`/usr/bin/ovm` and `/usr/bin/ovm-desktop`), and
+static CLI archives for macOS, Linux, and Android arm64, with checksums and
+SBOMs. See [RELEASING.md](docs/RELEASING.md). Unsigned macOS builds ask for
+confirmation on first launch (Control-click → Open).
+
 ## Requirements
 
 - Go 1.27.2

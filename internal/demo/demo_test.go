@@ -459,3 +459,15 @@ func TestClockCheckCombinesONVIFAndRTCP(t *testing.T) {
 		t.Fatalf("verdict = %q, onvif = %+v, rtcp = %+v", result.Verdict, result.ONVIF, result.RTCP)
 	}
 }
+
+// TestStabilityTestPassesAgainstTheDemoStream runs short reconnect cycles.
+func TestStabilityTestPassesAgainstTheDemoStream(t *testing.T) {
+	env := newTestEnvironment(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	report, err := env.Manager().StabilityTest(ctx, app.StreamSelection{DeviceID: env.DeviceID(), ProfileToken: "profile_main", Transport: app.StreamTransportTCP},
+		app.StabilityOptions{Cycles: 3, CycleDuration: 2 * time.Second}, nil)
+	if err != nil || report.Verdict != app.StabilityPass || report.Passed != 3 || report.MeanFPS <= 0 {
+		t.Fatalf("StabilityTest() = %+v, %v", report, err)
+	}
+}

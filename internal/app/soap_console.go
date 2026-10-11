@@ -134,3 +134,24 @@ func NewProductionMediaServices(options ProductionOptions) MediaServices {
 func NewProductionInventoryWith(options ProductionOptions) InventoryUseCase {
 	return &productionInventory{console: options.Console}
 }
+
+// ProductionUseCases returns ManagerDependencies with every device use case
+// filled by production adapters sharing options. Repository, HostInterfaces,
+// and Discovery are left for the caller.
+func ProductionUseCases(options ProductionOptions) ManagerDependencies {
+	services := NewProductionMediaServices(options)
+	return ManagerDependencies{
+		Inventory:     NewProductionInventoryWith(options),
+		Media:         services,
+		LiveStreams:   NewProductionLiveStreams(),
+		SnapshotFeeds: services,
+		Probe:         &probeUseCase{media: services, open: NewProductionLiveStreams(), now: time.Now},
+		Encoder:       services,
+		Imaging:       services,
+		Time:          services,
+		Users:         services,
+		Network:       services,
+		Maintenance:   services,
+		Events:        services,
+	}
+}

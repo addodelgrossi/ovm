@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">ovm application icon</title>
+  <desc id="description">A stylized camera connected to three network nodes.</desc>
+  <defs>
+    <linearGradient id="background" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5ea5b8"/>
+      <stop offset="1" stop-color="#245569"/>
+    </linearGradient>
+    <linearGradient id="camera" x1="280" y1="300" x2="750" y2="760" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dcecf1"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="34" stdDeviation="34" flood-color="#123441" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect x="52" y="52" width="920" height="920" rx="226" fill="url(#background)"/>
+  <g fill="none" stroke="#cce6ed" stroke-linecap="round" stroke-width="26" opacity="0.72">
+    <path d="M248 244 386 356"/>
+    <path d="m776 230-142 126"/>
+    <path d="m781 791-147-128"/>
+  </g>
+  <g fill="#e8f5f8" stroke="#ffffff" stroke-width="18">
+    <circle cx="218" cy="219" r="54"/>
+    <circle cx="806" cy="205" r="54"/>
+    <circle cx="811" cy="816" r="54"/>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="229" y="322" width="520" height="382" rx="118" fill="url(#camera)"/>
+    <path d="m749 431 126-70v304l-126-70z" fill="#e8f4f7" stroke="#ffffff" stroke-linejoin="round" stroke-width="18"/>
+    <circle cx="472" cy="513" r="119" fill="#2b6174"/>
+    <circle cx="472" cy="513" r="78" fill="#75b4c5"/>
+    <circle cx="439" cy="480" r="25" fill="#dff5f9" opacity="0.9"/>
+    <rect x="313" y="255" width="322" height="88" rx="42" fill="#eef8fa"/>
+  </g>
+</svg>

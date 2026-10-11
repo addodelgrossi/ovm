@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cameraEnvelope:Envelope xmlns:cameraEnvelope="http://schemas.xmlsoap.org/soap/envelope/"
+                         xmlns:cameraDevice="http://www.onvif.org/ver10/device/wsdl"
+                         xmlns:cameraTypes="http://www.onvif.org/ver10/schema">
+  <cameraEnvelope:Body>
+    <cameraDevice:GetNetworkInterfacesResponse>
+      <cameraDevice:NetworkInterfaces token="eth1">
+        <cameraTypes:Enabled>false</cameraTypes:Enabled>
+        <cameraTypes:Info>
+          <cameraTypes:Name>eth1</cameraTypes:Name>
+          <cameraTypes:HwAddress>00:00:5E:00:53:02</cameraTypes:HwAddress>
+        </cameraTypes:Info>
+      </cameraDevice:NetworkInterfaces>
+    </cameraDevice:GetNetworkInterfacesResponse>
+  </cameraEnvelope:Body>
+</cameraEnvelope:Envelope>

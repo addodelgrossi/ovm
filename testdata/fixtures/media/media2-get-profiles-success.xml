@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope" xmlns:tr2="http://www.onvif.org/ver20/media/wsdl" xmlns:tt="http://www.onvif.org/ver10/schema">
+  <env:Body>
+    <tr2:GetProfilesResponse>
+      <tr2:Profiles token="profile_main" fixed="true">
+        <tr2:Name>main</tr2:Name>
+        <tr2:Configurations>
+          <tr2:VideoSource token="source_config_main">
+            <tt:Name>Main source</tt:Name>
+            <tt:UseCount>1</tt:UseCount>
+            <tt:SourceToken>source_main</tt:SourceToken>
+            <tt:Bounds x="0" y="0" width="1920" height="1080"></tt:Bounds>
+          </tr2:VideoSource>
+          <tr2:VideoEncoder token="video_main" GovLength="30" Profile="Main">
+            <tt:Name>Main video</tt:Name>
+            <tt:UseCount>1</tt:UseCount>
+            <tt:Encoding>H264</tt:Encoding>
+            <tt:Resolution><tt:Width>1920</tt:Width><tt:Height>1080</tt:Height></tt:Resolution>
+            <tt:RateControl ConstantBitRate="true"><tt:FrameRateLimit>30</tt:FrameRateLimit><tt:BitrateLimit>4096</tt:BitrateLimit><tt:AverageBitRate>3072</tt:AverageBitRate></tt:RateControl>
+            <tt:Quality>5</tt:Quality>
+          </tr2:VideoEncoder>
+          <tr2:AudioEncoder token="audio_main">
+            <tt:Name>Main audio</tt:Name>
+            <tt:UseCount>1</tt:UseCount>
+            <tt:Encoding>PCMU</tt:Encoding>
+            <tt:Bitrate>64</tt:Bitrate>
+            <tt:SampleRate>8</tt:SampleRate>
+          </tr2:AudioEncoder>
+        </tr2:Configurations>
+      </tr2:Profiles>
+      <tr2:Profiles token="profile_sub" fixed="true"><tr2:Name>sub</tr2:Name></tr2:Profiles>
+    </tr2:GetProfilesResponse>
+  </env:Body>
+</env:Envelope>

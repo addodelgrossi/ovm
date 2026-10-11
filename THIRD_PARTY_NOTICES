@@ -1,0 +1,54 @@
+# Third-Party Notices
+
+The following runtime dependencies were introduced by the native
+secret-provider adapters (M3) and the live-preview pipeline (M4). The complete
+artifact-specific dependency inventory is generated from the locked module
+graph and reviewed before release.
+
+## github.com/zalando/go-keyring
+
+- Version: v0.2.8
+- Copyright: Copyright (c) 2016 Zalando SE
+- License: MIT
+- Source: https://github.com/zalando/go-keyring/tree/v0.2.8
+- Use: macOS Keychain and Linux Secret Service access
+
+The dependency's MIT license text is available at:
+https://github.com/zalando/go-keyring/blob/v0.2.8/LICENSE
+
+## github.com/bluenviron/mediacommon/v2
+
+- Version: v2.9.6
+- Copyright: Copyright (c) 2023 aler9
+- License: MIT
+- Source: https://github.com/bluenviron/mediacommon/tree/v2.9.6
+- Use: H.264 parsing and fragmented MP4 packaging
+
+## github.com/abema/go-mp4
+
+- Version: v1.7.3
+- Copyright: Copyright (c) 2020 AbemaTV
+- License: MIT
+- Source: https://github.com/abema/go-mp4/tree/v1.7.3
+- Use: MP4 box encoding (dependency of mediacommon)
+
+## github.com/bluenviron/gortsplib/v5
+
+- Version: v5.6.7
+- Copyright: Copyright (c) 2020 aler9
+- License: MIT
+- Source: https://github.com/bluenviron/gortsplib/tree/v5.6.7
+- Use: RTSP client for live preview (and the synthetic demo/test server)
+
+## Pion RTP stack (dependencies of gortsplib)
+
+- Modules: github.com/pion/rtp v1.10.5, github.com/pion/rtcp v1.2.19,
+  github.com/pion/sdp/v3 v3.0.20, github.com/pion/srtp/v3 v3.1.3,
+  github.com/pion/transport/v5 v5.1.1, github.com/pion/logging v0.2.4,
+  github.com/pion/randutil v0.1.0
+- Copyright: Copyright (c) The Pion community
+- License: MIT
+- Source: https://github.com/pion
+
+Build-only tools that are not distributed are documented separately by the
+release workflow.

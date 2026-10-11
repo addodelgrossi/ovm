@@ -1,0 +1,371 @@
+# ovm v0.1.0 Implementation Plan
+
+Status: **M6 — Diagnostics complete; M7 — Distribution built, publication blocked on hardware**
+Last updated: 2026-10-11
+
+## Product goal
+
+`ovm` is an open-source desktop and command-line manager for ONVIF-compatible
+cameras. It targets macOS first and Ubuntu Linux next. It helps a technician
+discover cameras, inspect and configure ONVIF services, preview and measure RTSP
+streams, run repeatable diagnostics, and export redacted evidence without
+becoming an NVR.
+
+The motivating workflow is a Mac connected by Ethernet to an isolated camera
+network. The technician must quickly retrieve main/substream URLs, enforce
+H.264 and day mode, configure NTP, replace supplied credentials, validate
+stream stability, and produce a report.
+
+## Locked decisions
+
+- Module: `github.com/addodelgrossi/ovm`
+- Bundle identifier: `io.github.addodelgrossi.ovm`
+- License: MIT
+- Platforms: macOS 13+ on amd64/arm64; Ubuntu 22.04+ on amd64/arm64
+- CLI diagnostic target: Linux arm64 and Android arm64 where the selected
+  dependencies support a static, headless build
+- Backend: Go using the current stable toolchain
+- Desktop: stable Wails v2 while Wails v3 remains prerelease
+- Frontend: Svelte, TypeScript, and Tailwind CSS
+- ONVIF: a small typed client based on official WSDL/XSD documents
+- RTSP: gortsplib and mediacommon, without transcoding
+- CLI: Cobra
+- Desktop secrets: macOS Keychain and Linux Secret Service through go-keyring
+- Communication and all repository content are English; maintainer chat may be
+  Brazilian Portuguese
+- No telemetry, cloud service, credential guessing, continuous recording, or
+  ONVIF conformance claim
+- PTZ is not on the v0.1.0 critical path
+
+## Architecture
+
+```text
+Cobra CLI ---------+
+                   +--> internal/app --> pkg/onvif --> SOAP / WS-Discovery
+Wails backend -----+        |          --> pkg/stream --> RTSP
+       |                    +----------> internal/store / secret provider
+Svelte frontend <--+-------- Wails bindings and events
+       ^
+       +--------------------- token-protected loopback preview bridge
+
+internal/fakedevice -------- integration tests and desktop demo mode
+```
+
+### Boundaries
+
+- `pkg/onvif` and `pkg/stream` are reusable public libraries. They do not
+  import Wails, Cobra, persistence, or application UI packages.
+- `internal/app` owns use-case orchestration, cancellation, capability
+  degradation, normalized DTOs, safe mutations, readback, and progress.
+- CLI and desktop consume `internal/app`; they do not duplicate protocol code.
+- `internal/store` persists only versioned, non-secret metadata. Passwords are
+  held by a secret-provider interface.
+- Long-running discovery, RTSP, event, and diagnostic operations have explicit
+  lifecycle ownership, bounded concurrency, context cancellation, and leak
+  tests.
+
+## Protocol principles
+
+### ONVIF and SOAP
+
+- Handwrite only the supported typed subset and cite the official source WSDL.
+- Prefer SOAP 1.2. Retry SOAP 1.1 only after protocol evidence such as HTTP 415
+  or `VersionMismatch`.
+- Parse known structures namespace-strictly, with controlled local-name
+  tolerance for prefix divergence.
+- Bound response bodies, reject DTDs, restrict URL schemes, and never forward
+  credentials to another origin through redirects.
+- Convert SOAP faults to typed Go errors while retaining bounded, redacted XML
+  for diagnostics.
+- Negotiate authentication in this order: unauthenticated system time,
+  offset-adjusted WS-UsernameToken PasswordDigest, HTTP Digest, and Basic only
+  after explicit opt-in.
+- Generate whole-second RFC3339 `Created` values for interoperability.
+- Prefer Media2 per operation and fall back to Media v1 only for a
+  namespace-resolved `ActionNotSupported` response—not for authentication,
+  cancellation, deadline, transport, HTTP, decode, malformed-response, or
+  security errors.
+- Represent support as `supported`, `unsupported`, `unknown`, or
+  `temporarily_unavailable`.
+- Every mutation follows: read current value, read options, validate, set,
+  poll/read back, and report exact/clamped/failed/disconnected.
+
+### Vendor quirks
+
+A quirk requires narrow manufacturer/model/firmware matching, provenance,
+a regression fixture, visible diagnostics, and an opt-out. Compatibility is
+reported separately as schema-tested, synthetic-fixture-tested,
+contributed-fixture-tested, or hardware-verified.
+
+### Streaming
+
+- RTSP-over-TCP is the default; UDP is optional.
+- The stream pipeline depacketizes video, detects codec configuration and
+  keyframes, measures statistics, and emits fMP4 initialization/media parts.
+- A preview bridge binds to `127.0.0.1` on an ephemeral port and uses random
+  session credentials, strict origins, bounded queues, and clean shutdown.
+- The frontend verifies codec support with MSE. Unsupported codecs fall back to
+  authenticated JPEG polling at an adaptive 1–5 fps.
+- Clips begin at a keyframe and are atomically finalized as fragmented MP4.
+- Measured bitrate means encoded media payload, not transport overhead.
+
+### Time accuracy
+
+ONVIF system time exposes integer seconds and is suitable only for coarse
+clock offset and configuration. Subsecond checks use RTCP Sender Reports when
+available and always report method and uncertainty. A result is
+`inconclusive` when the source cannot substantiate the requested precision.
+
+## Milestones
+
+| Milestone | Status | Deliverable | Exit gate |
+|---|---|---|---|
+| M0 Foundation | Complete | Repository, docs, ADR 0001, license, minimal CLI/desktop, CI | Passed locally and in GitHub Actions on macOS/Ubuntu |
+| M1 ONVIF Core + CLI | Complete | SOAP, auth, discovery, Device info, fake device, `discover`/`info` | Passed locally and in GitHub Actions on macOS/Ubuntu |
+| M2 Media | Complete | Media/Media2 reads, URLs, snapshots, `profiles`/`snapshot` | Passed locally and in GitHub Actions on macOS/Ubuntu |
+| M3 Desktop Base | Complete | Wails UI, persistence, Keychain, sidebar, Overview, Streams, demo | Discover and copy RTSP end to end |
+| M4 Video | Complete | RTSP, fMP4/MSE, fallback, stats, grid, record, probe | Native preview and measured diagnostics |
+| M5 Configuration | Complete | Encoder, Imaging, Time/NTP, Users, Network, Maintenance | Every mutation read back |
+| M6 Diagnostics | Complete | SOAP console, Events, clock/stability, reports, Quick Setup, palette | Complete redacted reports |
+| M7 Distribution | Built; publication blocked on hardware | macOS/Linux packages, CLI releases, two-camera gate, GitHub release | Physical acceptance and green release workflow |
+
+## Detailed milestone scope
+
+### M0 — Foundation
+
+- Add repository/community/security documentation and MIT license.
+- Pin a mutually compatible Go/Wails/Svelte/Tailwind toolchain after checking
+  the current stable release feeds (Wails v2.16.0 at M0 implementation time).
+- Create a minimal `ovm version` command with human and JSON output.
+- Create a minimal desktop shell sharing build metadata.
+- Add reproducible formatting, linting, testing, race, frontend, license, and
+  build commands.
+- Add GitHub Actions for macOS and Ubuntu.
+
+### M1 — ONVIF Core and CLI
+
+- SOAP 1.2/1.1 transport, typed faults, safe tracing, timeouts, and cancellation.
+- WS-Security PasswordDigest, clock offset, HTTP Digest, and explicit Basic.
+- Stateful fake ONVIF device and fixture provenance framework.
+- Typed Device inventory operations.
+- Interface-aware WS-Discovery, Hello/Bye, and manual endpoint entry.
+- `ovm discover` and `ovm info` with stable JSON output.
+
+Completed M1 work includes the seven typed Device inventory operations,
+separate correlated `tds:Device`/legacy NVT discovery probes, passive Hello/Bye
+lifecycle, manual endpoint handling, the shared `internal/app` boundary,
+production discovery/inventory adapters, and the `discover`/`info` commands with
+stable success/failure JSON envelopes, documented exit codes, cancellation, and
+credential redaction. Evidence is synthetic-fixture and remote-CI validation;
+no camera hardware is verified.
+
+### M2 — Media
+
+- Media v1 and Media2 profile/source/configuration reads.
+- Per-operation Media2 fallback and normalized profile DTOs.
+- Safe presentation RTSP/snapshot URI handling with private operational queries.
+- Authenticated, bounded JPEG retrieval with atomic no-clobber output and an
+  explicit overwrite opt-in.
+- `ovm profiles` and `ovm snapshot` with shared M1 credential policy, stable
+  typed JSON envelopes, deterministic human output, cancellation, and process
+  integration tests.
+
+Current work: the Media1/Media2 wire subset, shared authenticated application
+session, normalized profile and snapshot use cases, complete synthetic fake,
+CLI commands, default profile selection, and snapshot file-safety contract are
+implemented and pass local tests. M2 remains **In progress** until the remote CI
+gate passes. Evidence is synthetic-fixture only; no physical-camera verification
+or ONVIF conformance claim is made.
+
+### M3 — Desktop Base
+
+- Atomic device/preferences storage and platform secret providers.
+- Accessible design system, light/dark themes, English/pt-BR, and demo mode.
+- Device sidebar, scanning, interface selection, manual add, search, and status.
+- Overview and Streams tabs, copy actions, and optional VLC launch.
+- Local Network privacy description and actionable diagnostics.
+
+Current work: the versioned metadata store, Keychain/Secret Service providers
+with a compensating coordinator, host-interface enumeration, `app.Manager`, the
+Wails composition and typed binding envelopes, the isolated `--demo`
+environment, and the sidebar, Overview, and Streams UI with copy actions, VLC
+launch, themes, and English/pt-BR are implemented. Local and remote CI pass
+on macOS and Ubuntu, and the exit gate was exercised in the native macOS app in
+demo mode: scan, select, authenticate, and copy a credential-free RTSP URL.
+Known limits: the app cannot detect
+that macOS denied Local Network permission, so diagnostics give honest generic
+guidance and point to manual add; evidence is synthetic-fixture only.
+
+### M4 — Video
+
+- Cancellable RTSP sessions with TCP/UDP, auth, reconnect, and leak tests.
+- Codec/resolution/fps/bitrate/GOP/TTFF/loss/reconnect measurements.
+- H.264/H.265 fMP4 packaging and secure loopback preview bridge.
+- MSE Live view, snapshot fallback, fullscreen, and four-camera grid.
+- Keyframe-aligned MP4 clip recording.
+- Stream Probe in desktop and CLI.
+
+Current work: `pkg/stream` provides the RTSP client (gortsplib, TCP/UDP,
+Digest/Basic via the RTSP URL credentials, typed errors), H.264/H.265 fMP4
+muxing with DTS extraction, the remux pump, measurements, keyframe-aligned
+reconnection with continuous timestamps, and atomic clip recording.
+`internal/preview` is the token-protected loopback bridge for fMP4 streams and
+JPEG snapshot sessions. The desktop plays both codecs through MSE in WKWebView
+(verified natively in demo mode on macOS), falls back to adaptive 1–5 fps
+authenticated snapshots when the WebView cannot decode the codec, shows live
+statistics, records clips to the movies folder, offers a four-position grid
+with full screen, and runs 30-second probes; `ovm probe` exposes the same
+measurement in the CLI. The demo serves its main profile as H.265 and others as
+H.264 from an authenticated loopback RTSP server. Evidence is synthetic:
+`internal/synthmedia` generates lossless H.264 and embeds a small project-owned
+H.265 fixture. Local and remote CI pass on macOS and Ubuntu, and preview of
+both codecs, statistics, the grid, recording, and probing were exercised in
+the native macOS app in demo mode. Known limits: audio is not
+previewed or recorded; Linux WebKitGTK playback has not been verified natively.
+
+### M5 — Configuration
+
+- Validated Media/Media2 encoder mutations with readback.
+- Imaging settings/options including explicit IR Cut Day/Night/Auto semantics.
+- Manual time and NTP configuration with honest uncertainty.
+- User administration and supplied-default-credential warnings.
+- Guarded network changes with two confirmations and reconnection.
+- Reboot, soft factory reset, and bounded system-log retrieval.
+
+Current work: every M5 change reads the current value and the camera's
+options, validates the request against them, applies it, and reads it back,
+reporting `exact`, `adjusted`, `not_applied`, or `disconnected` with a
+before/requested/after table. Implemented areas: video encoder (Media2
+`SetVideoEncoderConfiguration` preferred, Media1 with the required Multicast
+and SessionTimeout preserved), Imaging ver20 (IR cut Day/Night/Auto,
+brightness, contrast, saturation, sharpness), time and NTP (manual sync to
+this computer with a whole-second offset and stated uncertainty), accounts
+(password change verified by signing in again, stored-secret rotation, local
+factory-default warning, no self-deletion), network (IPv4 static/DHCP,
+gateway, DNS, reboot when requested, read back at the new address, stored
+endpoint updated, typed confirmation), and maintenance (reboot with recovery
+wait, soft factory reset behind a typed confirmation, bounded sanitized
+system logs). The fake device models stateful Set operations, including
+firmware that clamps or ignores values, a reboot window, and accounts that
+drive authentication; it now answers token-less `GetSystemDateAndTime` as
+the ONVIF access policy requires. Hard factory reset is intentionally not
+offered. Evidence is synthetic; real network moves cannot be simulated
+because the fake keeps its listener, so moved-endpoint recovery is tested as
+`disconnected` plus the reported endpoint. Local and remote CI pass on macOS
+and Ubuntu, and encoder, image/IR cut, time, and reboot changes were exercised
+and confirmed in the native macOS app in demo mode.
+
+### M6 — Diagnostics and automation
+
+- Bounded, redacted SOAP Console.
+- PullPoint subscription, renewal, event feed, and filtering.
+- Hybrid Clock Sync Check and repeated Stability Test.
+- Deterministic, credential-free JSON and Markdown Device Reports.
+- Resumable Quick Setup and keyboard command palette.
+
+Current work: all M6 items are implemented with synthetic evidence. The SOAP
+console records redacted envelopes in memory only. PullPoint events cover
+create, pull, renew, unsubscribe, topic filters, resubscription, and a live
+desktop feed; the fake device and the demo camera publish events. The clock
+check combines ONVIF reads with RTCP Sender Reports and reports an honest
+`uncertain` verdict. The stability test, device reports (JSON and Markdown),
+and the `clock`, `stability`, `events`, and `report` commands share the
+application layer with the desktop Diagnostics tab. Quick Setup resumes per
+device; the command palette opens with ⌘/Ctrl+K. Local `make ci` and GitHub Actions
+on macOS/Ubuntu pass, and the Diagnostics tab (report export, clock check,
+stability test, events with filtering, SOAP console), Quick Setup, and the
+command palette were confirmed in the native macOS app in demo mode.
+
+### M7 — Distribution and release
+
+- Universal macOS app/DMG and Ubuntu 22.04 package.
+- GoReleaser CLI archives for supported Darwin/Linux/Android targets.
+- Checksums, SBOM, third-party notices, and sanitized screenshots.
+- GitHub Actions-only tagged release with least-privilege permissions.
+- Mandatory two-camera physical acceptance and checked-in sanitized validation
+  manifest before a release job can publish v0.1.0.
+
+Current work: everything that does not need hardware is in place. GoReleaser
+builds static CLI archives for Darwin and Linux (amd64/arm64) and Android
+arm64 with checksums and SPDX SBOMs; `scripts/package-macos.sh` builds a
+universal DMG (ad-hoc signed, or signed and notarized when Apple secrets
+exist); `scripts/package-linux.sh` builds amd64 and arm64 Debian packages that
+are installed and smoke-tested in CI. The release workflow is read-only except
+for its final job, runs as a dry run on pull requests, and on a version tag
+creates a draft release only after `internal/tools/validationgate` accepts
+`docs/validation/<tag>.json`. See [RELEASING.md](RELEASING.md). Publishing
+v0.1.0 is blocked on the two-camera acceptance and, optionally, Apple signing
+credentials.
+
+## Test policy
+
+- Use red-green-refactor for protocol and application behavior.
+- Every supported SOAP operation receives success, namespace-variation,
+  fault/unsupported, and malformed/optional-field coverage.
+- Synthetic fixtures are the default. Contributed captures are redacted and
+  include provenance.
+- Discovery tests inject packet connections instead of requiring multicast in
+  public CI.
+- RTSP tests use a local gortsplib server and project-owned synthetic media.
+- Frontend tests cover components, accessibility, keyboard behavior, and
+  mocked Wails bindings. Native WebKit smoke tests remain mandatory.
+- Public CI never requires real-camera credentials.
+- Optional real-device tests use `OVM_TEST_HOST`, `OVM_TEST_USER`, and
+  `OVM_TEST_PASS`.
+- Race and goroutine-leak checks cover long-running subsystems.
+
+## Release acceptance
+
+A physical release candidate must demonstrate, on a Mac connected to two
+cameras on an isolated LAN:
+
+1. Discovery on the selected wired interface or successful manual addition.
+2. Authentication and Keychain-backed reconnection with model/firmware shown.
+3. Main, substream, and snapshot URLs retrieved for both cameras.
+4. Two simultaneous previews with measured fps, bitrate, and GOP.
+5. H.264, supported encoder values, IR Cut Day, and NTP applied and read back.
+6. Supplied credential changed without guessing any other password.
+7. 30-second Stream Probe and 100 × 20-second Stability Test per camera.
+8. Credential-free Markdown and JSON reports exported.
+9. Discovery, information, profiles, and diagnostics repeated through CLI JSON.
+
+The `< 50 ms` clock criterion passes only with defensible subsecond evidence
+and uncertainty. An inconclusive result does not pass the release gate.
+
+## Current blockers
+
+- No physical cameras are currently available. This does not block M0–M6 or
+  release-workflow dry runs, but it blocks the validation manifest, release tag,
+  and v0.1.0 publication.
+- Signing/notarization credentials are not assumed. Unsigned artifacts and
+  complete instructions can be produced; signed/notarized publication requires
+  separately supplied secrets.
+
+## Risk register
+
+| Risk | Mitigation |
+|---|---|
+| Firmware divergence | Evidence-backed quirks, fixtures, per-operation fallback |
+| Wails/WebKit media behavior | Native fMP4 bridge spike before full Live UI |
+| H.265 unsupported | Runtime detection and JPEG fallback |
+| Local Network privacy | Correct plist, diagnostics, manual add, macOS 15 validation |
+| False subsecond precision | RTCP-based method, uncertainty, inconclusive state |
+| Network mutation disconnect | Double confirmation, endpoint rescan, recovery guidance |
+| Silent `Set*` failure | Mandatory delayed readback |
+| Credential leakage | OS keyring, redirect controls, redaction/property tests |
+| Android incompatibility | CLI-only build tags and binary inspection |
+| Scope growth | Strict milestone gates and no orphan abstractions |
+
+## Definition of done
+
+Every task must end with integrated behavior, targeted tests, formatting/lint
+and affected builds passing, cancellation and redaction preserved, and relevant
+documentation updated. No dead code, unexplained TODO, unpinned dependency, or
+unsupported compatibility claim is accepted.
+
+At each milestone close:
+
+1. Update this document with completed work, next work, and current risks.
+2. Update `CHANGELOG.md`.
+3. Run the complete milestone validation command.
+4. Commit with a small Conventional Commit message.

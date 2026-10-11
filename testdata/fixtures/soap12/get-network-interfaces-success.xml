@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope"
+              xmlns:tds="http://www.onvif.org/ver10/device/wsdl"
+              xmlns:tt="http://www.onvif.org/ver10/schema">
+  <env:Body>
+    <tds:GetNetworkInterfacesResponse>
+      <tds:NetworkInterfaces token="eth0">
+        <tt:Enabled>true</tt:Enabled>
+        <tt:Info>
+          <tt:Name>eth0</tt:Name>
+          <tt:HwAddress>00:00:5E:00:53:01</tt:HwAddress>
+          <tt:MTU>1500</tt:MTU>
+        </tt:Info>
+        <tt:IPv4>
+          <tt:Enabled>true</tt:Enabled>
+          <tt:Config>
+            <tt:Manual>
+              <tt:Address>203.0.113.10</tt:Address>
+              <tt:PrefixLength>24</tt:PrefixLength>
+            </tt:Manual>
+            <tt:DHCP>false</tt:DHCP>
+          </tt:Config>
+        </tt:IPv4>
+      </tds:NetworkInterfaces>
+    </tds:GetNetworkInterfacesResponse>
+  </env:Body>
+</env:Envelope>

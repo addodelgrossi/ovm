@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope" xmlns:tr2="http://www.onvif.org/ver20/media/wsdl">
+  <env:Body><tr2:GetSnapshotUriResponse><tr2:Uri>https://device.invalid/onvif/snapshot?profile=profile_main</tr2:Uri></tr2:GetSnapshotUriResponse></env:Body>
+</env:Envelope>

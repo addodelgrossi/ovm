@@ -1,0 +1,280 @@
+name: Release
+
+# A version tag builds every package and, only when the committed physical
+# acceptance manifest for that tag passes the gate, creates a draft GitHub
+# release for the maintainer to review and publish. Pull requests that touch
+# the release machinery and manual runs build the same packages as a dry run
+# without publishing anything.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .goreleaser.yaml
+      - scripts/**
+      - internal/release/**
+      - internal/tools/**
+      - docs/validation/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GOTOOLCHAIN: go1.27.2
+
+jobs:
+  gate:
+    name: Validation gate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    outputs:
+      publish: ${{ steps.gate.outputs.publish }}
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
+      date: ${{ steps.version.outputs.date }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.2
+          cache: true
+
+      - name: Test the gate
+        run: go test ./internal/release/... ./internal/tools/...
+
+      - name: Check the physical acceptance manifest
+        id: gate
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$REF_TYPE" = "tag" ]; then
+            go run ./internal/tools/validationgate "docs/validation/${TAG}.json" "$TAG"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Dry run: the manifest gate is enforced on version tags only."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute version
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          commit=$(git rev-parse HEAD)
+          if [ "$REF_TYPE" = "tag" ]; then
+            version=${TAG#v}
+          else
+            version="0.0.0-dryrun+${commit:0:12}"
+          fi
+          {
+            echo "version=$version"
+            echo "commit=$commit"
+            echo "date=$(git log -1 --format=%cI)"
+          } >> "$GITHUB_OUTPUT"
+
+  cli:
+    name: CLI archives
+    needs: gate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.2
+          cache: true
+
+      - name: Install Syft for SBOMs
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+
+      - name: Build archives, checksums, and SBOMs
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: v2.12.7
+          args: release --clean ${{ needs.gate.outputs.publish != 'true' && '--snapshot' || '' }}
+
+      - name: Upload CLI packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-cli
+          path: |
+            dist/*.tar.gz
+            dist/*_checksums.txt
+            dist/*.spdx.json
+          if-no-files-found: error
+
+  macos:
+    name: macOS universal DMG
+    needs: gate
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      HAS_SIGNING_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12 != '' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.2
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: desktop/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: make frontend-install
+
+      - name: Import the signing certificate
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        if: env.HAS_SIGNING_CERTIFICATE == 'true'
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password=$(openssl rand -hex 24)
+          printf '%s' "$APPLE_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain"
+          rm -f "$RUNNER_TEMP/certificate.p12"
+
+      - name: Build and package
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+          COMMIT: ${{ needs.gate.outputs.commit }}
+          DATE: ${{ needs.gate.outputs.date }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: scripts/package-macos.sh "$VERSION" "$COMMIT" "$DATE"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-macos
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  linux:
+    name: Ubuntu package (${{ matrix.runner }})
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-22.04
+          - ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.2
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: desktop/frontend/package-lock.json
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            dpkg-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            pkg-config
+
+      - name: Install frontend dependencies
+        run: make frontend-install
+
+      - name: Build and package
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+          COMMIT: ${{ needs.gate.outputs.commit }}
+          DATE: ${{ needs.gate.outputs.date }}
+        run: scripts/package-linux.sh "$VERSION" "$COMMIT" "$DATE"
+
+      - name: Smoke test the package
+        run: |
+          sudo apt-get install --yes ./dist/*.deb
+          ovm version
+          test -x /usr/bin/ovm-desktop
+
+      - name: Upload package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-linux-${{ runner.arch }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+  publish:
+    name: Draft GitHub release
+    needs: [gate, cli, macos, linux]
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: packages
+          merge-multiple: true
+
+      - name: Checksum desktop packages
+        working-directory: packages
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: sha256sum ./*.dmg ./*.deb | sed 's| \./| |' > "ovm_${VERSION}_desktop_checksums.txt"
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh release create "$TAG" packages/* \
+            --repo "$REPOSITORY" \
+            --verify-tag \
+            --draft \
+            --title "ovm $TAG" \
+            --notes "See CHANGELOG.md for changes and docs/validation/$TAG.json for the physical acceptance record."

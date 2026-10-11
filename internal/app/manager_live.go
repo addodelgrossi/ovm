@@ -1,0 +1,141 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/addodelgrossi/ovm/pkg/stream"
+)
+
+// LiveStreamOpener opens a live H.264 or H.265 stream. Production composition uses
+// NewProductionLiveStreams; tests and the demo inject their own.
+type LiveStreamOpener func(ctx context.Context, options stream.RTSPOptions) (stream.LiveSource, error)
+
+// NewProductionLiveStreams opens RTSP sessions with the pkg/stream client.
+func NewProductionLiveStreams() LiveStreamOpener {
+	return func(ctx context.Context, options stream.RTSPOptions) (stream.LiveSource, error) {
+		return stream.OpenRTSP(ctx, options)
+	}
+}
+
+// OpenLiveStream resolves the selected profile's stream through the
+// authenticated backend and opens it with the stored credentials. The URI and
+// credentials stay inside the backend; only the decoded media leaves.
+func (m *Manager) OpenLiveStream(ctx context.Context, selection StreamSelection) (stream.LiveSource, error) {
+	if m.liveStreams == nil {
+		return nil, newManagerError(CategoryInternal, "live streaming is not configured", nil)
+	}
+	uri, err := m.ResolveStreamURI(ctx, selection)
+	if err != nil {
+		return nil, err
+	}
+	device, resolveErr := m.resolveDevice(selection.DeviceID)
+	if resolveErr != nil {
+		return nil, resolveErr
+	}
+
+	options := stream.RTSPOptions{URL: uri, Transport: stream.TransportTCP}
+	if selection.Transport == StreamTransportUDP {
+		options.Transport = stream.TransportUDP
+	}
+	if device.CredentialReference != "" {
+		credentials, release, credErr := m.loadCredentials(ctx, device)
+		if credErr != nil {
+			return nil, credErr
+		}
+		options.Username = credentials.username
+		options.Password = credentials.password
+		release()
+	}
+	source, openErr := m.liveStreams(ctx, options)
+	options.Password = ""
+	if openErr != nil {
+		return nil, liveStreamError(openErr)
+	}
+	return source, nil
+}
+
+// liveStreamError maps typed stream failures onto safe manager errors.
+func liveStreamError(err error) *ManagerError {
+	switch {
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return managerErrorFromContext(err)
+	case errors.Is(err, stream.ErrRTSPAuthentication):
+		return newManagerError(CategoryAuthentication, "the camera rejected the stream credentials", err)
+	case errors.Is(err, stream.ErrRTSPNetwork):
+		return newManagerError(CategoryNetwork, "the camera stream could not be reached", err)
+	case errors.Is(err, stream.ErrRTSPUnsupportedCodec):
+		return newManagerError(CategoryProtocol, "the stream has no supported H.264 or H.265 video track", err)
+	case errors.Is(err, stream.ErrRTSPNotFound):
+		return newManagerError(CategoryProtocol, "the camera does not serve the selected stream", err)
+	default:
+		return newManagerError(CategoryProtocol, "the camera stream failed", err)
+	}
+}
+
+// OpenSnapshotFeed opens a repeatable, authenticated snapshot source for the
+// selected profile, used when the viewer cannot decode the live codec.
+func (m *Manager) OpenSnapshotFeed(ctx context.Context, selection StreamSelection) (SnapshotFeed, error) {
+	if err := m.ensureOpen(); err != nil {
+		return nil, err
+	}
+	if m.snapshotFeeds == nil {
+		return nil, newManagerError(CategoryInternal, "snapshot preview is not configured", nil)
+	}
+	if err := ValidateSnapshotProfileToken(selection.ProfileToken); err != nil {
+		return nil, managerErrorFromApp(err)
+	}
+	device, resolveErr := m.resolveDevice(selection.DeviceID)
+	if resolveErr != nil {
+		return nil, resolveErr
+	}
+	request := SnapshotFeedRequest{Host: device.Endpoint, ProfileToken: selection.ProfileToken}
+	if device.CredentialReference != "" {
+		credentials, release, credErr := m.loadCredentials(ctx, device)
+		if credErr != nil {
+			return nil, credErr
+		}
+		defer release()
+		request.Credentials = credentials
+	}
+	feed, err := m.snapshotFeeds.OpenSnapshotFeed(ctx, request)
+	if err != nil {
+		return nil, managerErrorFromApp(err)
+	}
+	return feed, nil
+}
+
+// ProbeStream measures the selected profile's stream for duration using the
+// stored credentials. A partial measurement accompanies an error.
+func (m *Manager) ProbeStream(ctx context.Context, selection StreamSelection, duration time.Duration) (ProbeResult, error) {
+	if err := m.ensureOpen(); err != nil {
+		return ProbeResult{}, err
+	}
+	if m.probe == nil {
+		return ProbeResult{}, newManagerError(CategoryInternal, "stream probing is not configured", nil)
+	}
+	device, resolveErr := m.resolveDevice(selection.DeviceID)
+	if resolveErr != nil {
+		return ProbeResult{}, resolveErr
+	}
+	request := ProbeRequest{
+		Host:         device.Endpoint,
+		ProfileToken: selection.ProfileToken,
+		Transport:    selection.Transport,
+		Duration:     duration,
+	}
+	if device.CredentialReference != "" {
+		credentials, release, credErr := m.loadCredentials(ctx, device)
+		if credErr != nil {
+			return ProbeResult{}, credErr
+		}
+		defer release()
+		request.Credentials = credentials
+	}
+	result, err := m.probe.Probe(ctx, request)
+	if err != nil {
+		return result, managerErrorFromApp(err)
+	}
+	return result, nil
+}

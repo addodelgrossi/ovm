@@ -1,0 +1,68 @@
+{
+  "schema": "ovm.validation-manifest/v1",
+  "release": "v0.1.0",
+  "ovm_commit": "0000000000000000000000000000000000000000",
+  "validated_at": "2026-01-31",
+  "validator": "maintainer GitHub handle",
+  "host": {
+    "os": "macOS 15.1",
+    "arch": "arm64"
+  },
+  "cameras": [
+    {
+      "label": "camera-a",
+      "manufacturer": "Vendor A",
+      "model": "Model A",
+      "firmware": "1.0.0",
+      "checks": {
+        "discovery": "pass",
+        "authentication": "pass",
+        "profiles": "pass",
+        "rtsp_copy": "pass",
+        "live_preview": "pass",
+        "h264": "pass",
+        "ntp": "pass",
+        "password_change": "pass",
+        "clock_check": "pass",
+        "stability": "pass",
+        "report": "pass",
+        "ir_day": "pass",
+        "events": "pass",
+        "recording": "pass",
+        "snapshot": "pass"
+      },
+      "stability": {
+        "cycles": 100,
+        "cycle_seconds": 20,
+        "passed": 100
+      },
+      "notes": "Optional free text. Camera address used: 192.0.2.10 (RFC 5737 ranges only)."
+    },
+    {
+      "label": "camera-b",
+      "manufacturer": "Vendor B",
+      "model": "Model B",
+      "firmware": "2.0.0",
+      "checks": {
+        "discovery": "pass",
+        "authentication": "pass",
+        "profiles": "pass",
+        "rtsp_copy": "pass",
+        "live_preview": "pass",
+        "h264": "pass",
+        "ntp": "pass",
+        "password_change": "pass",
+        "clock_check": "pass",
+        "stability": "pass",
+        "report": "pass",
+        "ir_day": "not_supported",
+        "events": "pass"
+      },
+      "stability": {
+        "cycles": 100,
+        "cycle_seconds": 20,
+        "passed": 100
+      }
+    }
+  ]
+}

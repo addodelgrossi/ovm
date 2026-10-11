@@ -8,15 +8,109 @@
   import StreamsView from './components/StreamsView.svelte'
   import LiveGridView from './components/LiveGridView.svelte'
   import SettingsView from './components/SettingsView.svelte'
+  import DiagnosticsView from './components/DiagnosticsView.svelte'
+  import CommandPalette from './components/CommandPalette.svelte'
+  import QuickSetupDialog from './components/QuickSetupDialog.svelte'
+  import type { Command } from './lib/commands'
   import ToastRegion from './components/ToastRegion.svelte'
   import type { AuthenticateInput, Locale, Tab, Theme } from './lib/api'
-  import { errorMessage, t } from './lib/i18n'
+  import { errorMessage, t, type TranslationKey } from './lib/i18n'
   import { createAppState } from './lib/state.svelte'
 
   const model = createAppState()
   let manualDialogOpen = $state(false)
   let authDialogOpen = $state(false)
   let forgetDialogOpen = $state(false)
+  let paletteOpen = $state(false)
+  let quickSetupOpen = $state(false)
+
+  let paletteCommands = $derived(buildCommands())
+
+  function buildCommands(): Command[] {
+    const locale = model.locale
+    const commands: Command[] = []
+    const device = model.selectedDevice
+    if (device) {
+      const tabs: [Tab, TranslationKey][] = [
+        ['overview', 'tabs.overviewShortcut'],
+        ['streams', 'tabs.streamsShortcut'],
+        ['settings', 'tabs.settingsShortcut'],
+        ['diagnostics', 'tabs.diagnosticsShortcut']
+      ]
+      if (model.capabilities.live_preview_available)
+        tabs.splice(2, 0, ['live', 'tabs.liveShortcut'])
+      for (const [tab, key] of tabs) {
+        commands.push({
+          id: `tab-${tab}`,
+          label: t(locale, 'palette.goTo', { tab: t(locale, key) }),
+          run: () => void model.activateTab(tab)
+        })
+      }
+      if (device.has_credentials) {
+        commands.push({
+          id: 'quick-setup',
+          label: t(locale, 'quick.title'),
+          hint: t(locale, 'palette.quickHint'),
+          run: () => openQuickSetup()
+        })
+      }
+      commands.push({
+        id: 'authenticate',
+        label: t(locale, 'action.authenticate'),
+        run: () => (authDialogOpen = true)
+      })
+    }
+    commands.push(
+      {
+        id: 'scan',
+        label: t(locale, 'palette.scan'),
+        run: () => void model.scan()
+      },
+      {
+        id: 'manual',
+        label: t(locale, 'sidebar.manualAdd'),
+        run: () => (manualDialogOpen = true)
+      },
+      {
+        id: 'refresh',
+        label: t(locale, 'action.refresh'),
+        hint: '⌘/Ctrl+R',
+        run: () => void model.refresh()
+      }
+    )
+    for (const candidate of model.overview.devices) {
+      if (candidate.id === device?.id) continue
+      commands.push({
+        id: `select-${candidate.id}`,
+        label: t(locale, 'palette.select', {
+          name: candidate.display_name || candidate.endpoint
+        }),
+        run: () => void model.selectDevice(candidate.id)
+      })
+    }
+    for (const theme of ['system', 'light', 'dark'] as Theme[]) {
+      commands.push({
+        id: `theme-${theme}`,
+        label: t(locale, 'palette.theme', {
+          theme: t(locale, `preferences.theme.${theme}` as TranslationKey)
+        }),
+        run: () => void model.updateTheme(theme)
+      })
+    }
+    commands.push({
+      id: 'language',
+      label: locale === 'en' ? 'Português (Brasil)' : 'English',
+      hint: t(locale, 'preferences.language'),
+      run: () => void model.updateLocale(locale === 'en' ? 'pt-BR' : 'en')
+    })
+    return commands
+  }
+
+  function openQuickSetup(): void {
+    if (!model.selectedDevice) return
+    void model.loadProfiles(model.selectedDevice.id)
+    quickSetupOpen = true
+  }
 
   onMount(() => {
     void model.bootstrap()
@@ -35,6 +129,21 @@
 
   function keyboardShortcut(event: KeyboardEvent): void {
     if (
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      event.key.toLowerCase() === 'k' &&
+      !manualDialogOpen &&
+      !authDialogOpen &&
+      !forgetDialogOpen &&
+      !quickSetupOpen
+    ) {
+      event.preventDefault()
+      paletteOpen = !paletteOpen
+      return
+    }
+    if (
+      paletteOpen ||
+      quickSetupOpen ||
       !(event.metaKey || event.ctrlKey) ||
       event.altKey ||
       isEditableTarget(event.target) ||
@@ -73,6 +182,11 @@
     if (key === '4' && model.selectedDevice) {
       event.preventDefault()
       void model.activateTab('settings')
+      return
+    }
+    if (key === '5' && model.selectedDevice) {
+      event.preventDefault()
+      void model.activateTab('diagnostics')
     }
   }
 
@@ -276,6 +390,26 @@
             >
               {t(model.locale, 'tabs.settingsShortcut')}
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={model.activeTab === 'diagnostics'}
+              aria-controls="diagnostics-panel"
+              aria-keyshortcuts="Meta+5 Control+5"
+              class:active={model.activeTab === 'diagnostics'}
+              onclick={() => activateTab('diagnostics')}
+            >
+              {t(model.locale, 'tabs.diagnosticsShortcut')}
+            </button>
+            {#if model.selectedDevice.has_credentials}
+              <button
+                type="button"
+                class="button button-secondary tab-action"
+                onclick={openQuickSetup}
+              >
+                {t(model.locale, 'quick.title')}
+              </button>
+            {/if}
           </nav>
 
           {#if model.activeTab === 'overview'}
@@ -289,6 +423,10 @@
           {:else if model.activeTab === 'settings'}
             <div id="settings-panel" role="tabpanel">
               <SettingsView {model} device={model.selectedDevice} />
+            </div>
+          {:else if model.activeTab === 'diagnostics'}
+            <div id="diagnostics-panel" role="tabpanel">
+              <DiagnosticsView {model} device={model.selectedDevice} />
             </div>
           {:else if model.activeTab === 'live'}
             <div id="live-panel" role="tabpanel">
@@ -373,6 +511,27 @@
       busy={model.authenticatingDeviceId === model.selectedDevice.id}
       onSubmit={authenticate}
       onClose={() => (authDialogOpen = false)}
+    />
+  {/if}
+
+  {#if paletteOpen}
+    <CommandPalette
+      locale={model.locale}
+      commands={paletteCommands}
+      onClose={() => (paletteOpen = false)}
+    />
+  {/if}
+
+  {#if quickSetupOpen && model.selectedDevice}
+    <QuickSetupDialog
+      locale={model.locale}
+      device={model.selectedDevice}
+      profiles={model.profilesByDevice[model.selectedDevice.id]?.data
+        ?.profiles ?? []}
+      onClose={() => (quickSetupOpen = false)}
+      onChanged={() =>
+        model.selectedDevice &&
+        void model.loadProfiles(model.selectedDevice.id, true)}
     />
   {/if}
 

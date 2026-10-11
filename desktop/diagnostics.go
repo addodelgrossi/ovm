@@ -40,9 +40,13 @@ const (
 
 // EventRecord is one received event with a feed-local identifier.
 type EventRecord struct {
-	ID         uint64 `json:"id"`
-	ReceivedAt string `json:"received_at"`
-	core.EventDTO
+	ID                uint64              `json:"id"`
+	ReceivedAt        string              `json:"received_at"`
+	Topic             string              `json:"topic"`
+	UTCTime           string              `json:"utc_time,omitempty"`
+	PropertyOperation string              `json:"property_operation,omitempty"`
+	Source            []core.EventItemDTO `json:"source"`
+	Data              []core.EventItemDTO `json:"data"`
 }
 
 type eventFeed struct {
@@ -281,7 +285,10 @@ func (f *eventFeed) append(received []core.EventDTO) {
 	defer f.mu.Unlock()
 	for _, event := range received {
 		f.nextID++
-		f.events = append(f.events, EventRecord{ID: f.nextID, ReceivedAt: now, EventDTO: event})
+		f.events = append(f.events, EventRecord{
+			ID: f.nextID, ReceivedAt: now, Topic: event.Topic, UTCTime: event.UTCTime,
+			PropertyOperation: event.PropertyOperation, Source: event.Source, Data: event.Data,
+		})
 	}
 	if overflow := len(f.events) - maxFeedEvents; overflow > 0 {
 		f.events = append([]EventRecord(nil), f.events[overflow:]...)

@@ -57,7 +57,19 @@ const apiMock = vi.hoisted(() => ({
   applyNetwork: vi.fn(),
   reboot: vi.fn(),
   softFactoryReset: vi.fn(),
-  systemLog: vi.fn()
+  systemLog: vi.fn(),
+  setConsoleEnabled: vi.fn(),
+  consoleEntries: vi.fn(),
+  clearConsole: vi.fn(),
+  startEvents: vi.fn(),
+  pollEvents: vi.fn(),
+  stopEvents: vi.fn(),
+  clockCheck: vi.fn(),
+  startStability: vi.fn(),
+  stabilityStatus: vi.fn(),
+  stopStability: vi.fn(),
+  exportReport: vi.fn(),
+  revealReport: vi.fn()
 }))
 
 const liveSession = {
@@ -399,6 +411,9 @@ function setDefaultMocks(): void {
     })
   )
   apiMock.openInVLC.mockResolvedValue({ data: { completed: true } })
+  apiMock.consoleEntries.mockResolvedValue({
+    data: { enabled: false, entries: [] }
+  })
 }
 
 async function renderReady(): Promise<void> {
@@ -1540,5 +1555,73 @@ describe('App M3 integration', () => {
     await waitFor(() => expect(document.activeElement).toBe(endpoint))
     expect(within(dialog).getByRole('button', { name: 'Close' })).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeTruthy()
+  })
+
+  it('opens the command palette and runs a command with the keyboard', async () => {
+    await renderReady()
+    await fireEvent.keyDown(window, { key: 'k', metaKey: true })
+    const input = await screen.findByRole('combobox', {
+      name: 'Command palette'
+    })
+    await fireEvent.input(input, { target: { value: 'go diag' } })
+    expect(
+      within(screen.getByRole('listbox')).getAllByRole('option')
+    ).toHaveLength(1)
+    await fireEvent.keyDown(input, { key: 'Enter' })
+    expect(
+      await screen.findByRole('heading', { name: 'Diagnostics' })
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole('combobox', { name: 'Command palette' })
+    ).toBeNull()
+  })
+
+  it('checks the clock and saves a credential-free report from Diagnostics', async () => {
+    apiMock.clockCheck.mockResolvedValue({
+      data: {
+        checked_at: '2026-10-10T12:00:00Z',
+        tolerance_seconds: 2,
+        verdict: 'uncertain',
+        date_time_type: 'NTP',
+        ntp_servers: ['192.0.2.1'],
+        onvif: {
+          source: 'onvif',
+          offset_seconds: 1.8,
+          uncertainty_seconds: 0.6
+        },
+        rtcp_unavailable: 'the camera sent no RTCP Sender Report in time'
+      }
+    })
+    apiMock.exportReport.mockResolvedValue({
+      data: {
+        markdown_path: '/Users/tech/Documents/ovm/ovm-report-cam-1.md',
+        json_path: '/Users/tech/Documents/ovm/ovm-report-cam-1.json',
+        markdown: '# Device report: Front camera'
+      }
+    })
+    apiMock.revealReport.mockResolvedValue({ data: { completed: true } })
+    await renderReady()
+    await fireEvent.click(screen.getByRole('tab', { name: /Diagnostics/ }))
+    await fireEvent.click(
+      await screen.findByRole('button', { name: 'Check clock' })
+    )
+    expect(apiMock.clockCheck).toHaveBeenCalledWith(
+      'camera-front',
+      'profile_main'
+    )
+    expect(
+      (await screen.findByText(/Uncertain: the measurement cannot tell/))
+        .textContent
+    ).toContain('±2 s')
+    expect(screen.getByText(/RTCP: the camera sent no RTCP/)).toBeTruthy()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Save report' }))
+    expect(await screen.findByText('Report saved.')).toBeTruthy()
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Show in folder' })
+    )
+    expect(apiMock.revealReport).toHaveBeenCalledWith(
+      '/Users/tech/Documents/ovm/ovm-report-cam-1.md'
+    )
   })
 })

@@ -34,7 +34,19 @@ import {
   SystemLog,
   StartSnapshotPreview,
   StopPreview,
-  UpdatePreferences
+  UpdatePreferences,
+  ClearConsole,
+  ClockCheck,
+  ConsoleEntries,
+  ExportReport,
+  PollEvents,
+  RevealReport,
+  SetConsoleEnabled,
+  StabilityStatus,
+  StartEvents,
+  StartStability,
+  StopEvents,
+  StopStability
 } from '../../wailsjs/go/main/App.js'
 import { main } from '../../wailsjs/go/models'
 import {
@@ -45,8 +57,115 @@ import {
 
 export type Locale = 'en' | 'pt-BR'
 export type Theme = 'system' | 'light' | 'dark'
-export type Tab = 'overview' | 'streams' | 'live' | 'settings'
+export type Tab = 'overview' | 'streams' | 'live' | 'settings' | 'diagnostics'
 export type Transport = 'tcp' | 'udp'
+
+export interface ConsoleEntry {
+  id: number
+  time: string
+  endpoint: string
+  action: string
+  version: string
+  status_code: number
+  outcome: string
+  duration_ms: number
+  request_xml: string
+  response_xml: string
+}
+
+export interface ConsoleState {
+  enabled: boolean
+  entries: ConsoleEntry[]
+}
+
+export interface EventItem {
+  name: string
+  value: string
+}
+
+export interface EventRecord {
+  id: number
+  received_at: string
+  topic: string
+  utc_time?: string
+  property_operation?: string
+  source: EventItem[]
+  data: EventItem[]
+}
+
+export interface EventFeedState {
+  feed_id: string
+  state: string
+  error?: ApiError
+  events: EventRecord[]
+}
+
+export interface ClockEstimate {
+  source: string
+  offset_seconds: number
+  uncertainty_seconds: number
+  round_trip_ms?: number
+}
+
+export interface ClockCheckResult {
+  checked_at: string
+  tolerance_seconds: number
+  verdict: string
+  date_time_type: string
+  ntp_servers: string[]
+  onvif?: ClockEstimate
+  rtcp?: ClockEstimate
+  rtcp_unavailable?: string
+}
+
+export interface StabilityCycle {
+  index: number
+  passed: boolean
+  error?: string
+  result?: ProbeResult
+}
+
+export interface StabilityReport {
+  profile_token: string
+  transport: string
+  cycles_requested: number
+  cycle_seconds: number
+  cycles_completed: number
+  passed: number
+  failed: number
+  verdict: string
+  min_ttff_ms: number
+  median_ttff_ms: number
+  max_ttff_ms: number
+  mean_fps: number
+  mean_bitrate_kbps: number
+  lost_packets: number
+  started_at: string
+  finished_at: string
+  cycles: StabilityCycle[]
+}
+
+export interface StabilityJobState {
+  job_id: string
+  state: string
+  error?: ApiError
+  cycles: StabilityCycle[]
+  report?: StabilityReport
+}
+
+export interface StabilityRequest {
+  profileToken: string
+  transport: Transport
+  cycles: number
+  cycleSeconds: number
+  pauseSeconds: number
+}
+
+export interface ReportExport {
+  markdown_path: string
+  json_path: string
+  markdown: string
+}
 
 export interface ApiError {
   category: string
@@ -619,6 +738,30 @@ export interface OvmApi {
   ): Promise<ApiResponse<EncoderApplyResult>>
   startRecording(sessionId: string): Promise<ApiResponse<RecordingResult>>
   stopRecording(sessionId: string): Promise<ApiResponse<RecordingResult>>
+  setConsoleEnabled(enabled: boolean): Promise<ApiResponse<ConsoleState>>
+  consoleEntries(afterId: number): Promise<ApiResponse<ConsoleState>>
+  clearConsole(): Promise<ApiResponse<ConsoleState>>
+  startEvents(
+    deviceId: string,
+    topicFilter: string
+  ): Promise<ApiResponse<EventFeedState>>
+  pollEvents(
+    feedId: string,
+    afterId: number
+  ): Promise<ApiResponse<EventFeedState>>
+  stopEvents(feedId: string): Promise<ApiResponse<{ completed: boolean }>>
+  clockCheck(
+    deviceId: string,
+    profileToken: string
+  ): Promise<ApiResponse<ClockCheckResult>>
+  startStability(
+    deviceId: string,
+    request: StabilityRequest
+  ): Promise<ApiResponse<StabilityJobState>>
+  stabilityStatus(jobId: string): Promise<ApiResponse<StabilityJobState>>
+  stopStability(jobId: string): Promise<ApiResponse<{ completed: boolean }>>
+  exportReport(deviceId: string): Promise<ApiResponse<ReportExport>>
+  revealReport(path: string): Promise<ApiResponse<{ completed: boolean }>>
 }
 
 interface BindingEnvelope<T> {
@@ -794,6 +937,47 @@ export const api: OvmApi = {
     invoke<RecordingResult>(() => StopRecording({ session_id: sessionId })),
   previewStats: (sessionId) =>
     invoke<PreviewStats>(() => ReadPreviewStats({ session_id: sessionId })),
+  setConsoleEnabled: (enabled) =>
+    invoke<ConsoleState>(() => SetConsoleEnabled({ enabled })),
+  consoleEntries: (afterId) =>
+    invoke<ConsoleState>(() => ConsoleEntries({ after_id: afterId })),
+  clearConsole: () => invoke<ConsoleState>(() => ClearConsole()),
+  startEvents: (deviceId, topicFilter) =>
+    invoke<EventFeedState>(() =>
+      StartEvents({ device_id: deviceId, topic_filter: topicFilter })
+    ),
+  pollEvents: (feedId, afterId) =>
+    invoke<EventFeedState>(() =>
+      PollEvents({ feed_id: feedId, after_id: afterId })
+    ),
+  stopEvents: (feedId) =>
+    invoke<{ completed: boolean }>(() =>
+      StopEvents({ feed_id: feedId, after_id: 0 })
+    ),
+  clockCheck: (deviceId, profileToken) =>
+    invoke<ClockCheckResult>(() =>
+      ClockCheck({ device_id: deviceId, profile_token: profileToken })
+    ),
+  startStability: (deviceId, request) =>
+    invoke<StabilityJobState>(() =>
+      StartStability({
+        device_id: deviceId,
+        profile_token: request.profileToken,
+        transport: request.transport,
+        cycles: request.cycles,
+        cycle_seconds: request.cycleSeconds,
+        pause_seconds: request.pauseSeconds,
+        accept_long_run: true
+      })
+    ),
+  stabilityStatus: (jobId) =>
+    invoke<StabilityJobState>(() => StabilityStatus({ job_id: jobId })),
+  stopStability: (jobId) =>
+    invoke<{ completed: boolean }>(() => StopStability({ job_id: jobId })),
+  exportReport: (deviceId) =>
+    invoke<ReportExport>(() => ExportReport({ device_id: deviceId })),
+  revealReport: (path) =>
+    invoke<{ completed: boolean }>(() => RevealReport({ path })),
   async copyText(text) {
     // The native clipboard works even when the WebView blocks navigator.clipboard.
     try {

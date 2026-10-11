@@ -1107,6 +1107,20 @@ export namespace app {
       return a
     }
   }
+  export class EventItemDTO {
+    name: string
+    value: string
+
+    static createFrom(source: any = {}) {
+      return new EventItemDTO(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.name = source['name']
+      this.value = source['value']
+    }
+  }
 
   export class HostInterfaceDTO {
     index: number

@@ -1906,3 +1906,209 @@ tbody th {
 .checkbox-field {
   cursor: pointer;
 }
+
+/* M6 diagnostics */
+.diag-result {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.diag-result p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--warning);
+}
+
+.diag-result[data-verdict='in_sync'] p,
+.diag-result[data-verdict='pass'] p {
+  color: var(--success);
+}
+
+.diag-result[data-verdict='out_of_sync'] p,
+.diag-result[data-verdict='fail'] p {
+  color: var(--danger);
+}
+
+.diag-result small {
+  color: var(--muted);
+}
+
+.diag-feed {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.diag-feed td {
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+.stability-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.stability-strip span {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.stability-strip .cycle-pass {
+  background: var(--success);
+}
+
+.stability-strip .cycle-fail {
+  background: var(--danger);
+}
+
+.report-preview {
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diag-path {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+}
+
+.console-row {
+  cursor: pointer;
+}
+
+.console-row.selected td {
+  background: var(--surface-muted);
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.console-filter {
+  max-width: 240px;
+}
+
+.console-detail {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.console-detail h4 {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+}
+
+.tab-action {
+  margin-left: auto;
+}
+
+.quick-setup {
+  max-width: 560px;
+}
+
+.quick-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  counter-reset: quick;
+}
+
+.quick-steps li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  counter-increment: quick;
+}
+
+.quick-steps li span::before {
+  content: counter(quick) '. ';
+}
+
+.quick-steps li.current {
+  border-color: var(--accent, var(--success));
+  font-weight: 600;
+}
+
+.quick-steps li[data-status='done'] small {
+  color: var(--success);
+}
+
+.quick-steps li[data-status='skipped'] small,
+.quick-steps li[data-status='pending'] small {
+  color: var(--muted);
+}
+
+.quick-notes {
+  margin: 8px 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+}
+
+.palette-layer {
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
+.palette {
+  width: min(560px, calc(100vw - 32px));
+  padding: 10px;
+}
+
+.palette ul {
+  max-height: 50vh;
+  overflow-y: auto;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.palette li button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.palette li.active button {
+  background: var(--surface-muted);
+}
+
+.palette li small,
+.palette-empty {
+  color: var(--muted);
+}
+
+.palette-empty {
+  padding: 8px 10px;
+}

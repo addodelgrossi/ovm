@@ -35,6 +35,9 @@ type fakeManager struct {
 	lastUserChange core.UserChange
 	preferencesFn  func(context.Context, core.PreferencesRequest) (core.Overview, error)
 	closeFn        func() error
+	subscribeFn    func(context.Context, string, string) (core.EventSubscription, error)
+	stabilityFn    func(context.Context, core.StreamSelection, core.StabilityOptions, func(core.StabilityCycle)) (core.StabilityReport, error)
+	lastReport     core.ReportOptions
 }
 
 func newFakeManager() *fakeManager {
@@ -256,6 +259,68 @@ func (f *fakeManager) SoftFactoryReset(context.Context, string) (core.Maintenanc
 func (f *fakeManager) SystemLog(context.Context, string, string) (core.SystemLogResult, error) {
 	f.called("system_log")
 	return core.SystemLogResult{}, nil
+}
+
+func (f *fakeManager) SubscribeEvents(ctx context.Context, deviceID, filter string) (core.EventSubscription, error) {
+	f.called("subscribe_events")
+	if f.subscribeFn != nil {
+		return f.subscribeFn(ctx, deviceID, filter)
+	}
+	return &fakeSubscription{}, nil
+}
+
+func (f *fakeManager) ClockCheck(context.Context, string, string, time.Duration) (core.ClockCheckResult, error) {
+	f.called("clock_check")
+	return core.ClockCheckResult{Verdict: core.ClockInSync}, nil
+}
+
+func (f *fakeManager) StabilityTest(ctx context.Context, selection core.StreamSelection, options core.StabilityOptions, progress func(core.StabilityCycle)) (core.StabilityReport, error) {
+	f.called("stability")
+	if f.stabilityFn != nil {
+		return f.stabilityFn(ctx, selection, options, progress)
+	}
+	return core.StabilityReport{}, nil
+}
+
+func (f *fakeManager) BuildReport(_ context.Context, _ string, options core.ReportOptions) (core.DeviceReport, error) {
+	f.called("report")
+	f.mu.Lock()
+	f.lastReport = options
+	f.mu.Unlock()
+	return core.DeviceReport{Schema: core.ReportSchema, Device: core.ReportDevice{Model: "Fake/Cam 1"}, Profiles: []core.ReportProfile{}, Unavailable: []core.ReportGap{}}, nil
+}
+
+// fakeSubscription returns queued batches, then waits for cancellation.
+type fakeSubscription struct {
+	mu      sync.Mutex
+	batches [][]core.EventDTO
+	closed  int
+}
+
+func (s *fakeSubscription) Pull(ctx context.Context) ([]core.EventDTO, error) {
+	s.mu.Lock()
+	if len(s.batches) > 0 {
+		batch := s.batches[0]
+		s.batches = s.batches[1:]
+		s.mu.Unlock()
+		return batch, nil
+	}
+	s.mu.Unlock()
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (s *fakeSubscription) Close(context.Context) error {
+	s.mu.Lock()
+	s.closed++
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *fakeSubscription) closeCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.closed
 }
 
 func (f *fakeManager) UpdatePreferences(ctx context.Context, request core.PreferencesRequest) (core.Overview, error) {

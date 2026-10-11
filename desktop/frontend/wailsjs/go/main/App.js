@@ -38,12 +38,28 @@ export function CancelScan() {
   return window['go']['main']['App']['CancelScan']()
 }
 
+export function ClearConsole() {
+  return window['go']['main']['App']['ClearConsole']()
+}
+
+export function ClockCheck(arg1) {
+  return window['go']['main']['App']['ClockCheck'](arg1)
+}
+
+export function ConsoleEntries(arg1) {
+  return window['go']['main']['App']['ConsoleEntries'](arg1)
+}
+
 export function CreateUser(arg1) {
   return window['go']['main']['App']['CreateUser'](arg1)
 }
 
 export function DeleteUser(arg1) {
   return window['go']['main']['App']['DeleteUser'](arg1)
+}
+
+export function ExportReport(arg1) {
+  return window['go']['main']['App']['ExportReport'](arg1)
 }
 
 export function ForgetDevice(arg1) {
@@ -64,6 +80,10 @@ export function LoadProfiles(arg1) {
 
 export function OpenInVLC(arg1) {
   return window['go']['main']['App']['OpenInVLC'](arg1)
+}
+
+export function PollEvents(arg1) {
+  return window['go']['main']['App']['PollEvents'](arg1)
 }
 
 export function PreviewStats(arg1) {
@@ -102,6 +122,10 @@ export function RevealClip(arg1) {
   return window['go']['main']['App']['RevealClip'](arg1)
 }
 
+export function RevealReport(arg1) {
+  return window['go']['main']['App']['RevealReport'](arg1)
+}
+
 export function Scan(arg1) {
   return window['go']['main']['App']['Scan'](arg1)
 }
@@ -110,12 +134,24 @@ export function SelectDevice(arg1) {
   return window['go']['main']['App']['SelectDevice'](arg1)
 }
 
+export function SetConsoleEnabled(arg1) {
+  return window['go']['main']['App']['SetConsoleEnabled'](arg1)
+}
+
 export function SetUser(arg1) {
   return window['go']['main']['App']['SetUser'](arg1)
 }
 
 export function SoftFactoryReset(arg1) {
   return window['go']['main']['App']['SoftFactoryReset'](arg1)
+}
+
+export function StabilityStatus(arg1) {
+  return window['go']['main']['App']['StabilityStatus'](arg1)
+}
+
+export function StartEvents(arg1) {
+  return window['go']['main']['App']['StartEvents'](arg1)
 }
 
 export function StartPreview(arg1) {
@@ -130,12 +166,24 @@ export function StartSnapshotPreview(arg1) {
   return window['go']['main']['App']['StartSnapshotPreview'](arg1)
 }
 
+export function StartStability(arg1) {
+  return window['go']['main']['App']['StartStability'](arg1)
+}
+
+export function StopEvents(arg1) {
+  return window['go']['main']['App']['StopEvents'](arg1)
+}
+
 export function StopPreview(arg1) {
   return window['go']['main']['App']['StopPreview'](arg1)
 }
 
 export function StopRecording(arg1) {
   return window['go']['main']['App']['StopRecording'](arg1)
+}
+
+export function StopStability(arg1) {
+  return window['go']['main']['App']['StopStability'](arg1)
 }
 
 export function SystemLog(arg1) {

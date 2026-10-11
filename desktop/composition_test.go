@@ -83,7 +83,7 @@ func TestDemoCompositionSkipsProductionStorageAndClosesOwner(t *testing.T) {
 			productionSecretCalls++
 			return nil, nil
 		},
-		newDemo: func(context.Context) (Manager, LifecycleCloser, error) {
+		newDemo: func(context.Context, *core.SOAPConsole) (Manager, LifecycleCloser, error) {
 			return manager, closer, nil
 		},
 		newVLC: func() VLCLauncher { return &fakeVLCLauncher{available: true} },

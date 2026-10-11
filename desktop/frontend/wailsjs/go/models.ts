@@ -375,6 +375,486 @@ export namespace app {
     }
   }
 
+  export class ClockEstimate {
+    source: string
+    offset_seconds: number
+    uncertainty_seconds: number
+    round_trip_ms?: number
+
+    static createFrom(source: any = {}) {
+      return new ClockEstimate(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.source = source['source']
+      this.offset_seconds = source['offset_seconds']
+      this.uncertainty_seconds = source['uncertainty_seconds']
+      this.round_trip_ms = source['round_trip_ms']
+    }
+  }
+  export class ClockCheckResult {
+    checked_at: string
+    tolerance_seconds: number
+    verdict: string
+    date_time_type: string
+    ntp_servers: string[]
+    onvif?: ClockEstimate
+    rtcp?: ClockEstimate
+    rtcp_unavailable?: string
+
+    static createFrom(source: any = {}) {
+      return new ClockCheckResult(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.checked_at = source['checked_at']
+      this.tolerance_seconds = source['tolerance_seconds']
+      this.verdict = source['verdict']
+      this.date_time_type = source['date_time_type']
+      this.ntp_servers = source['ntp_servers']
+      this.onvif = this.convertValues(source['onvif'], ClockEstimate)
+      this.rtcp = this.convertValues(source['rtcp'], ClockEstimate)
+      this.rtcp_unavailable = source['rtcp_unavailable']
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+
+  export class ReportGap {
+    section: string
+    reason: string
+
+    static createFrom(source: any = {}) {
+      return new ReportGap(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.section = source['section']
+      this.reason = source['reason']
+    }
+  }
+  export class ProbeResult {
+    profile_token: string
+    transport: string
+    codec: string
+    width: number
+    height: number
+    frames_per_second: number
+    bitrate_kbps: number
+    gop_frames: number
+    gop_seconds: number
+    time_to_first_frame_ms: number
+    frames: number
+    keyframes: number
+    lost_packets: number
+    duration_ms: number
+    complete: boolean
+
+    static createFrom(source: any = {}) {
+      return new ProbeResult(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.profile_token = source['profile_token']
+      this.transport = source['transport']
+      this.codec = source['codec']
+      this.width = source['width']
+      this.height = source['height']
+      this.frames_per_second = source['frames_per_second']
+      this.bitrate_kbps = source['bitrate_kbps']
+      this.gop_frames = source['gop_frames']
+      this.gop_seconds = source['gop_seconds']
+      this.time_to_first_frame_ms = source['time_to_first_frame_ms']
+      this.frames = source['frames']
+      this.keyframes = source['keyframes']
+      this.lost_packets = source['lost_packets']
+      this.duration_ms = source['duration_ms']
+      this.complete = source['complete']
+    }
+  }
+  export class StabilityCycle {
+    index: number
+    passed: boolean
+    error?: string
+    result?: ProbeResult
+
+    static createFrom(source: any = {}) {
+      return new StabilityCycle(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.index = source['index']
+      this.passed = source['passed']
+      this.error = source['error']
+      this.result = this.convertValues(source['result'], ProbeResult)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class StabilityReport {
+    profile_token: string
+    transport: string
+    cycles_requested: number
+    cycle_seconds: number
+    cycles_completed: number
+    passed: number
+    failed: number
+    verdict: string
+    min_ttff_ms: number
+    median_ttff_ms: number
+    max_ttff_ms: number
+    mean_fps: number
+    mean_bitrate_kbps: number
+    lost_packets: number
+    started_at: string
+    finished_at: string
+    cycles: StabilityCycle[]
+
+    static createFrom(source: any = {}) {
+      return new StabilityReport(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.profile_token = source['profile_token']
+      this.transport = source['transport']
+      this.cycles_requested = source['cycles_requested']
+      this.cycle_seconds = source['cycle_seconds']
+      this.cycles_completed = source['cycles_completed']
+      this.passed = source['passed']
+      this.failed = source['failed']
+      this.verdict = source['verdict']
+      this.min_ttff_ms = source['min_ttff_ms']
+      this.median_ttff_ms = source['median_ttff_ms']
+      this.max_ttff_ms = source['max_ttff_ms']
+      this.mean_fps = source['mean_fps']
+      this.mean_bitrate_kbps = source['mean_bitrate_kbps']
+      this.lost_packets = source['lost_packets']
+      this.started_at = source['started_at']
+      this.finished_at = source['finished_at']
+      this.cycles = this.convertValues(source['cycles'], StabilityCycle)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class UserDTO {
+    username: string
+    level: string
+
+    static createFrom(source: any = {}) {
+      return new UserDTO(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.username = source['username']
+      this.level = source['level']
+    }
+  }
+  export class ReportUsers {
+    accounts: UserDTO[]
+    default_credential_warning: boolean
+
+    static createFrom(source: any = {}) {
+      return new ReportUsers(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.accounts = this.convertValues(source['accounts'], UserDTO)
+      this.default_credential_warning = source['default_credential_warning']
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class NetworkView {
+    interface_token: string
+    interface_name: string
+    hw_address: string
+    dhcp: boolean
+    address: string
+    prefix_length: number
+    gateways: string[]
+    dns_from_dhcp: boolean
+    dns_servers: string[]
+
+    static createFrom(source: any = {}) {
+      return new NetworkView(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.interface_token = source['interface_token']
+      this.interface_name = source['interface_name']
+      this.hw_address = source['hw_address']
+      this.dhcp = source['dhcp']
+      this.address = source['address']
+      this.prefix_length = source['prefix_length']
+      this.gateways = source['gateways']
+      this.dns_from_dhcp = source['dns_from_dhcp']
+      this.dns_servers = source['dns_servers']
+    }
+  }
+  export class TimeView {
+    date_time_type: string
+    time_zone: string
+    daylight_savings: boolean
+    device_utc?: string
+    clock_offset_seconds?: number
+    uncertainty_seconds: number
+    ntp_from_dhcp: boolean
+    ntp_servers: string[]
+
+    static createFrom(source: any = {}) {
+      return new TimeView(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.date_time_type = source['date_time_type']
+      this.time_zone = source['time_zone']
+      this.daylight_savings = source['daylight_savings']
+      this.device_utc = source['device_utc']
+      this.clock_offset_seconds = source['clock_offset_seconds']
+      this.uncertainty_seconds = source['uncertainty_seconds']
+      this.ntp_from_dhcp = source['ntp_from_dhcp']
+      this.ntp_servers = source['ntp_servers']
+    }
+  }
+  export class ImagingSettingsDTO {
+    brightness?: number
+    color_saturation?: number
+    contrast?: number
+    sharpness?: number
+    ir_cut_filter?: string
+
+    static createFrom(source: any = {}) {
+      return new ImagingSettingsDTO(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.brightness = source['brightness']
+      this.color_saturation = source['color_saturation']
+      this.contrast = source['contrast']
+      this.sharpness = source['sharpness']
+      this.ir_cut_filter = source['ir_cut_filter']
+    }
+  }
+  export class ReportImaging {
+    profile_token: string
+    settings: ImagingSettingsDTO
+
+    static createFrom(source: any = {}) {
+      return new ReportImaging(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.profile_token = source['profile_token']
+      this.settings = this.convertValues(source['settings'], ImagingSettingsDTO)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class ReportProfile {
+    token: string
+    name?: string
+    codec?: string
+    codec_profile?: string
+    width?: number
+    height?: number
+    frame_rate_fps?: number
+    bitrate_kbps?: number
+    gop_length?: number
+    rtsp_uri?: string
+    snapshot_uri?: string
+
+    static createFrom(source: any = {}) {
+      return new ReportProfile(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.token = source['token']
+      this.name = source['name']
+      this.codec = source['codec']
+      this.codec_profile = source['codec_profile']
+      this.width = source['width']
+      this.height = source['height']
+      this.frame_rate_fps = source['frame_rate_fps']
+      this.bitrate_kbps = source['bitrate_kbps']
+      this.gop_length = source['gop_length']
+      this.rtsp_uri = source['rtsp_uri']
+      this.snapshot_uri = source['snapshot_uri']
+    }
+  }
+  export class ReportDevice {
+    display_name?: string
+    endpoint: string
+    manufacturer?: string
+    model?: string
+    firmware_version?: string
+    serial_number?: string
+    hardware_id?: string
+    hostname?: string
+
+    static createFrom(source: any = {}) {
+      return new ReportDevice(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.display_name = source['display_name']
+      this.endpoint = source['endpoint']
+      this.manufacturer = source['manufacturer']
+      this.model = source['model']
+      this.firmware_version = source['firmware_version']
+      this.serial_number = source['serial_number']
+      this.hardware_id = source['hardware_id']
+      this.hostname = source['hostname']
+    }
+  }
+  export class DeviceReport {
+    schema: string
+    generator: string
+    generated_at: string
+    device: ReportDevice
+    profiles: ReportProfile[]
+    imaging?: ReportImaging
+    time?: TimeView
+    network?: NetworkView
+    users?: ReportUsers
+    clock_check?: ClockCheckResult
+    stability?: StabilityReport
+    unavailable: ReportGap[]
+
+    static createFrom(source: any = {}) {
+      return new DeviceReport(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.schema = source['schema']
+      this.generator = source['generator']
+      this.generated_at = source['generated_at']
+      this.device = this.convertValues(source['device'], ReportDevice)
+      this.profiles = this.convertValues(source['profiles'], ReportProfile)
+      this.imaging = this.convertValues(source['imaging'], ReportImaging)
+      this.time = this.convertValues(source['time'], TimeView)
+      this.network = this.convertValues(source['network'], NetworkView)
+      this.users = this.convertValues(source['users'], ReportUsers)
+      this.clock_check = this.convertValues(
+        source['clock_check'],
+        ClockCheckResult
+      )
+      this.stability = this.convertValues(source['stability'], StabilityReport)
+      this.unavailable = this.convertValues(source['unavailable'], ReportGap)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
   export class DiscoveryDiagnostic {
     category: string
     detail?: string
@@ -684,26 +1164,6 @@ export namespace app {
     }
   }
 
-  export class ImagingSettingsDTO {
-    brightness?: number
-    color_saturation?: number
-    contrast?: number
-    sharpness?: number
-    ir_cut_filter?: string
-
-    static createFrom(source: any = {}) {
-      return new ImagingSettingsDTO(source)
-    }
-
-    constructor(source: any = {}) {
-      if ('string' === typeof source) source = JSON.parse(source)
-      this.brightness = source['brightness']
-      this.color_saturation = source['color_saturation']
-      this.contrast = source['contrast']
-      this.sharpness = source['sharpness']
-      this.ir_cut_filter = source['ir_cut_filter']
-    }
-  }
   export class ImagingApplyResult {
     before: ImagingSettingsDTO
     after: ImagingSettingsDTO
@@ -1011,34 +1471,6 @@ export namespace app {
     }
   }
 
-  export class NetworkView {
-    interface_token: string
-    interface_name: string
-    hw_address: string
-    dhcp: boolean
-    address: string
-    prefix_length: number
-    gateways: string[]
-    dns_from_dhcp: boolean
-    dns_servers: string[]
-
-    static createFrom(source: any = {}) {
-      return new NetworkView(source)
-    }
-
-    constructor(source: any = {}) {
-      if ('string' === typeof source) source = JSON.parse(source)
-      this.interface_token = source['interface_token']
-      this.interface_name = source['interface_name']
-      this.hw_address = source['hw_address']
-      this.dhcp = source['dhcp']
-      this.address = source['address']
-      this.prefix_length = source['prefix_length']
-      this.gateways = source['gateways']
-      this.dns_from_dhcp = source['dns_from_dhcp']
-      this.dns_servers = source['dns_servers']
-    }
-  }
   export class NetworkApplyResult {
     before: NetworkView
     after?: NetworkView
@@ -1136,47 +1568,37 @@ export namespace app {
       return a
     }
   }
-  export class ProbeResult {
-    profile_token: string
-    transport: string
-    codec: string
-    width: number
-    height: number
-    frames_per_second: number
-    bitrate_kbps: number
-    gop_frames: number
-    gop_seconds: number
-    time_to_first_frame_ms: number
-    frames: number
-    keyframes: number
-    lost_packets: number
+
+  export class SOAPConsoleEntry {
+    id: number
+    time: string
+    endpoint: string
+    action: string
+    version: string
+    status_code: number
+    outcome: string
     duration_ms: number
-    complete: boolean
+    request_xml: string
+    response_xml: string
 
     static createFrom(source: any = {}) {
-      return new ProbeResult(source)
+      return new SOAPConsoleEntry(source)
     }
 
     constructor(source: any = {}) {
       if ('string' === typeof source) source = JSON.parse(source)
-      this.profile_token = source['profile_token']
-      this.transport = source['transport']
-      this.codec = source['codec']
-      this.width = source['width']
-      this.height = source['height']
-      this.frames_per_second = source['frames_per_second']
-      this.bitrate_kbps = source['bitrate_kbps']
-      this.gop_frames = source['gop_frames']
-      this.gop_seconds = source['gop_seconds']
-      this.time_to_first_frame_ms = source['time_to_first_frame_ms']
-      this.frames = source['frames']
-      this.keyframes = source['keyframes']
-      this.lost_packets = source['lost_packets']
+      this.id = source['id']
+      this.time = source['time']
+      this.endpoint = source['endpoint']
+      this.action = source['action']
+      this.version = source['version']
+      this.status_code = source['status_code']
+      this.outcome = source['outcome']
       this.duration_ms = source['duration_ms']
-      this.complete = source['complete']
+      this.request_xml = source['request_xml']
+      this.response_xml = source['response_xml']
     }
   }
-
   export class ScanConflict {
     endpoint_reference?: string
     endpoint?: string
@@ -1253,32 +1675,6 @@ export namespace app {
       this.truncated = source['truncated']
     }
   }
-  export class TimeView {
-    date_time_type: string
-    time_zone: string
-    daylight_savings: boolean
-    device_utc?: string
-    clock_offset_seconds?: number
-    uncertainty_seconds: number
-    ntp_from_dhcp: boolean
-    ntp_servers: string[]
-
-    static createFrom(source: any = {}) {
-      return new TimeView(source)
-    }
-
-    constructor(source: any = {}) {
-      if ('string' === typeof source) source = JSON.parse(source)
-      this.date_time_type = source['date_time_type']
-      this.time_zone = source['time_zone']
-      this.daylight_savings = source['daylight_savings']
-      this.device_utc = source['device_utc']
-      this.clock_offset_seconds = source['clock_offset_seconds']
-      this.uncertainty_seconds = source['uncertainty_seconds']
-      this.ntp_from_dhcp = source['ntp_from_dhcp']
-      this.ntp_servers = source['ntp_servers']
-    }
-  }
   export class TimeApplyResult {
     before: TimeView
     after: TimeView
@@ -1332,20 +1728,6 @@ export namespace app {
     }
   }
 
-  export class UserDTO {
-    username: string
-    level: string
-
-    static createFrom(source: any = {}) {
-      return new UserDTO(source)
-    }
-
-    constructor(source: any = {}) {
-      if ('string' === typeof source) source = JSON.parse(source)
-      this.username = source['username']
-      this.level = source['level']
-    }
-  }
   export class UsersApplyResult {
     users: UserDTO[]
     report: MutationReport
@@ -1833,6 +2215,129 @@ export namespace main {
     }
   }
 
+  export class ClockCheckRequest {
+    device_id: string
+    profile_token: string
+
+    static createFrom(source: any = {}) {
+      return new ClockCheckRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.device_id = source['device_id']
+      this.profile_token = source['profile_token']
+    }
+  }
+  export class ClockCheckResponse {
+    result?: app.ClockCheckResult
+    error?: BindingError
+
+    static createFrom(source: any = {}) {
+      return new ClockCheckResponse(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.result = this.convertValues(source['result'], app.ClockCheckResult)
+      this.error = this.convertValues(source['error'], BindingError)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class ConsoleEntriesRequest {
+    after_id: number
+
+    static createFrom(source: any = {}) {
+      return new ConsoleEntriesRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.after_id = source['after_id']
+    }
+  }
+  export class ConsoleState {
+    enabled: boolean
+    entries: app.SOAPConsoleEntry[]
+
+    static createFrom(source: any = {}) {
+      return new ConsoleState(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.enabled = source['enabled']
+      this.entries = this.convertValues(source['entries'], app.SOAPConsoleEntry)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class ConsoleResponse {
+    result?: ConsoleState
+    error?: BindingError
+
+    static createFrom(source: any = {}) {
+      return new ConsoleResponse(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.result = this.convertValues(source['result'], ConsoleState)
+      this.error = this.convertValues(source['error'], BindingError)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+
   export class DeleteUserRequest {
     device_id: string
     username: string
@@ -1979,6 +2484,143 @@ export namespace main {
         return new classs(a)
       }
       return a
+    }
+  }
+  export class EventFeedRequest {
+    feed_id: string
+    after_id: number
+
+    static createFrom(source: any = {}) {
+      return new EventFeedRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.feed_id = source['feed_id']
+      this.after_id = source['after_id']
+    }
+  }
+  export class EventRecord {
+    id: number
+    received_at: string
+    topic: string
+    utc_time?: string
+    property_operation?: string
+    source: app.EventItemDTO[]
+    data: app.EventItemDTO[]
+
+    static createFrom(source: any = {}) {
+      return new EventRecord(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.id = source['id']
+      this.received_at = source['received_at']
+      this.topic = source['topic']
+      this.utc_time = source['utc_time']
+      this.property_operation = source['property_operation']
+      this.source = this.convertValues(source['source'], app.EventItemDTO)
+      this.data = this.convertValues(source['data'], app.EventItemDTO)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class EventFeedState {
+    feed_id: string
+    state: string
+    error?: BindingError
+    events: EventRecord[]
+
+    static createFrom(source: any = {}) {
+      return new EventFeedState(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.feed_id = source['feed_id']
+      this.state = source['state']
+      this.error = this.convertValues(source['error'], BindingError)
+      this.events = this.convertValues(source['events'], EventRecord)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class EventFeedResponse {
+    result?: EventFeedState
+    error?: BindingError
+
+    static createFrom(source: any = {}) {
+      return new EventFeedResponse(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.result = this.convertValues(source['result'], EventFeedState)
+      this.error = this.convertValues(source['error'], BindingError)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+
+  export class ExportReportRequest {
+    device_id: string
+
+    static createFrom(source: any = {}) {
+      return new ExportReportRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.device_id = source['device_id']
     }
   }
   export class FactoryResetRequest {
@@ -2488,11 +3130,91 @@ export namespace main {
     }
   }
 
+  export class ReportExport {
+    markdown_path: string
+    json_path: string
+    markdown: string
+    report: app.DeviceReport
+
+    static createFrom(source: any = {}) {
+      return new ReportExport(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.markdown_path = source['markdown_path']
+      this.json_path = source['json_path']
+      this.markdown = source['markdown']
+      this.report = this.convertValues(source['report'], app.DeviceReport)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class ReportExportResponse {
+    result?: ReportExport
+    error?: BindingError
+
+    static createFrom(source: any = {}) {
+      return new ReportExportResponse(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.result = this.convertValues(source['result'], ReportExport)
+      this.error = this.convertValues(source['error'], BindingError)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
   export class RevealClipRequest {
     path: string
 
     static createFrom(source: any = {}) {
       return new RevealClipRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.path = source['path']
+    }
+  }
+  export class RevealReportRequest {
+    path: string
+
+    static createFrom(source: any = {}) {
+      return new RevealReportRequest(source)
     }
 
     constructor(source: any = {}) {
@@ -2544,6 +3266,115 @@ export namespace main {
         return new classs(a)
       }
       return a
+    }
+  }
+  export class SetConsoleEnabledRequest {
+    enabled: boolean
+
+    static createFrom(source: any = {}) {
+      return new SetConsoleEnabledRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.enabled = source['enabled']
+    }
+  }
+  export class StabilityJobRequest {
+    job_id: string
+
+    static createFrom(source: any = {}) {
+      return new StabilityJobRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.job_id = source['job_id']
+    }
+  }
+  export class StabilityJobState {
+    job_id: string
+    state: string
+    error?: BindingError
+    cycles: app.StabilityCycle[]
+    report?: app.StabilityReport
+
+    static createFrom(source: any = {}) {
+      return new StabilityJobState(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.job_id = source['job_id']
+      this.state = source['state']
+      this.error = this.convertValues(source['error'], BindingError)
+      this.cycles = this.convertValues(source['cycles'], app.StabilityCycle)
+      this.report = this.convertValues(source['report'], app.StabilityReport)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+  export class StabilityJobResponse {
+    result?: StabilityJobState
+    error?: BindingError
+
+    static createFrom(source: any = {}) {
+      return new StabilityJobResponse(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.result = this.convertValues(source['result'], StabilityJobState)
+      this.error = this.convertValues(source['error'], BindingError)
+    }
+
+    convertValues(a: any, classs: any, asMap: boolean = false): any {
+      if (!a) {
+        return a
+      }
+      if (a.slice && a.map) {
+        return (a as any[]).map((elem) => this.convertValues(elem, classs))
+      } else if ('object' === typeof a) {
+        if (asMap) {
+          for (const key of Object.keys(a)) {
+            a[key] = new classs(a[key])
+          }
+          return a
+        }
+        return new classs(a)
+      }
+      return a
+    }
+  }
+
+  export class StartEventsRequest {
+    device_id: string
+    topic_filter: string
+
+    static createFrom(source: any = {}) {
+      return new StartEventsRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.device_id = source['device_id']
+      this.topic_filter = source['topic_filter']
     }
   }
   export class StartPreviewRequest {
@@ -2609,6 +3440,30 @@ export namespace main {
     }
   }
 
+  export class StartStabilityRequest {
+    device_id: string
+    profile_token: string
+    transport: string
+    cycles: number
+    cycle_seconds: number
+    pause_seconds: number
+    accept_long_run: boolean
+
+    static createFrom(source: any = {}) {
+      return new StartStabilityRequest(source)
+    }
+
+    constructor(source: any = {}) {
+      if ('string' === typeof source) source = JSON.parse(source)
+      this.device_id = source['device_id']
+      this.profile_token = source['profile_token']
+      this.transport = source['transport']
+      this.cycles = source['cycles']
+      this.cycle_seconds = source['cycle_seconds']
+      this.pause_seconds = source['pause_seconds']
+      this.accept_long_run = source['accept_long_run']
+    }
+  }
   export class StopPreviewRequest {
     session_id: string
 

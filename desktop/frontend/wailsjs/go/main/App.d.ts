@@ -33,6 +33,16 @@ export function BuildInfo(): Promise<buildinfo.Info>
 
 export function CancelScan(): Promise<main.CancelScanResponse>
 
+export function ClearConsole(): Promise<main.ConsoleResponse>
+
+export function ClockCheck(
+  arg1: main.ClockCheckRequest
+): Promise<main.ClockCheckResponse>
+
+export function ConsoleEntries(
+  arg1: main.ConsoleEntriesRequest
+): Promise<main.ConsoleResponse>
+
 export function CreateUser(
   arg1: main.UserChangeRequest
 ): Promise<main.UsersApplyResponse>
@@ -40,6 +50,10 @@ export function CreateUser(
 export function DeleteUser(
   arg1: main.DeleteUserRequest
 ): Promise<main.UsersApplyResponse>
+
+export function ExportReport(
+  arg1: main.ExportReportRequest
+): Promise<main.ReportExportResponse>
 
 export function ForgetDevice(
   arg1: main.DeviceIDRequest
@@ -58,6 +72,10 @@ export function LoadProfiles(
 export function OpenInVLC(
   arg1: main.OpenInVLCRequest
 ): Promise<main.ActionResponse>
+
+export function PollEvents(
+  arg1: main.EventFeedRequest
+): Promise<main.EventFeedResponse>
 
 export function PreviewStats(
   arg1: main.PreviewStatsRequest
@@ -95,11 +113,19 @@ export function RevealClip(
   arg1: main.RevealClipRequest
 ): Promise<main.ActionResponse>
 
+export function RevealReport(
+  arg1: main.RevealReportRequest
+): Promise<main.ActionResponse>
+
 export function Scan(arg1: main.ScanRequest): Promise<main.ScanResponse>
 
 export function SelectDevice(
   arg1: main.DeviceIDRequest
 ): Promise<main.OverviewResponse>
+
+export function SetConsoleEnabled(
+  arg1: main.SetConsoleEnabledRequest
+): Promise<main.ConsoleResponse>
 
 export function SetUser(
   arg1: main.UserChangeRequest
@@ -108,6 +134,14 @@ export function SetUser(
 export function SoftFactoryReset(
   arg1: main.FactoryResetRequest
 ): Promise<main.MaintenanceResponse>
+
+export function StabilityStatus(
+  arg1: main.StabilityJobRequest
+): Promise<main.StabilityJobResponse>
+
+export function StartEvents(
+  arg1: main.StartEventsRequest
+): Promise<main.EventFeedResponse>
 
 export function StartPreview(
   arg1: main.StartPreviewRequest
@@ -121,6 +155,14 @@ export function StartSnapshotPreview(
   arg1: main.StartPreviewRequest
 ): Promise<main.StartPreviewResponse>
 
+export function StartStability(
+  arg1: main.StartStabilityRequest
+): Promise<main.StabilityJobResponse>
+
+export function StopEvents(
+  arg1: main.EventFeedRequest
+): Promise<main.ActionResponse>
+
 export function StopPreview(
   arg1: main.StopPreviewRequest
 ): Promise<main.ActionResponse>
@@ -128,6 +170,10 @@ export function StopPreview(
 export function StopRecording(
   arg1: main.RecordingRequest
 ): Promise<main.RecordingResponse>
+
+export function StopStability(
+  arg1: main.StabilityJobRequest
+): Promise<main.ActionResponse>
 
 export function SystemLog(
   arg1: main.SystemLogRequest

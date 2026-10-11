@@ -32,7 +32,7 @@ type compositionFactories struct {
 	newRepository func() (*store.Repository, error)
 	newSecrets    func() (store.SecretProvider, error)
 	newManager    func(core.ManagerDependencies) (Manager, error)
-	newDemo       func(context.Context) (Manager, LifecycleCloser, error)
+	newDemo       func(context.Context, *core.SOAPConsole) (Manager, LifecycleCloser, error)
 	newVLC        func() VLCLauncher
 }
 
@@ -45,8 +45,8 @@ func productionCompositionFactories() compositionFactories {
 		newManager: func(dependencies core.ManagerDependencies) (Manager, error) {
 			return core.NewManager(dependencies)
 		},
-		newDemo: func(ctx context.Context) (Manager, LifecycleCloser, error) {
-			environment, err := demo.NewEnvironment(ctx)
+		newDemo: func(ctx context.Context, console *core.SOAPConsole) (Manager, LifecycleCloser, error) {
+			environment, err := demo.NewEnvironmentWith(ctx, core.ProductionOptions{Console: console})
 			if err != nil {
 				return nil, nil, err
 			}
@@ -83,12 +83,14 @@ func composeDesktop(ctx context.Context, options desktopOptions, factories compo
 		return nil, errors.New("the VLC capability factory is not configured")
 	}
 	launcher := factories.newVLC()
+	// One in-memory console records redacted SOAP exchanges from every adapter.
+	console := core.NewSOAPConsole(soapConsoleCapacity)
 
 	if options.Demo {
 		if factories.newDemo == nil {
 			return nil, errors.New("the demo factory is not configured")
 		}
-		manager, closer, err := factories.newDemo(ctx)
+		manager, closer, err := factories.newDemo(ctx, console)
 		if err != nil {
 			return nil, fmt.Errorf("compose demo environment: %w", err)
 		}
@@ -97,6 +99,7 @@ func composeDesktop(ctx context.Context, options desktopOptions, factories compo
 			DemoCloser:     closer,
 			VLC:            launcher,
 			PreviewSources: managerPreviewSources,
+			Console:        console,
 			Demo:           true,
 		})
 		if err != nil {
@@ -125,26 +128,15 @@ func composeDesktop(ctx context.Context, options desktopOptions, factories compo
 	if err != nil {
 		return nil, fmt.Errorf("compose manager repository: %w", err)
 	}
-	manager, err := factories.newManager(core.ManagerDependencies{
-		Repository:     managerRepository,
-		HostInterfaces: core.NewProductionHostInterfaces(),
-		Discovery:      core.NewProductionDiscovery(),
-		Inventory:      core.NewProductionInventory(),
-		Media:          core.NewProductionMediaProfiles(),
-		LiveStreams:    core.NewProductionLiveStreams(),
-		SnapshotFeeds:  core.NewProductionSnapshotFeed(),
-		Probe:          core.NewProductionProbe(),
-		Encoder:        core.NewProductionEncoder(),
-		Imaging:        core.NewProductionImaging(),
-		Time:           core.NewProductionTime(),
-		Users:          core.NewProductionUsers(),
-		Network:        core.NewProductionNetwork(),
-		Maintenance:    core.NewProductionMaintenance(),
-	})
+	dependencies := core.ProductionUseCases(core.ProductionOptions{Console: console})
+	dependencies.Repository = managerRepository
+	dependencies.HostInterfaces = core.NewProductionHostInterfaces()
+	dependencies.Discovery = core.NewProductionDiscovery()
+	manager, err := factories.newManager(dependencies)
 	if err != nil {
 		return nil, fmt.Errorf("compose device manager: %w", err)
 	}
-	host, err := NewApp(AppDependencies{Manager: manager, VLC: launcher, PreviewSources: managerPreviewSources})
+	host, err := NewApp(AppDependencies{Manager: manager, VLC: launcher, PreviewSources: managerPreviewSources, Console: console})
 	if err != nil {
 		if manager != nil {
 			_ = manager.Close()

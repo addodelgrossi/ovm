@@ -47,6 +47,10 @@ type Manager interface {
 	Reboot(context.Context, string) (core.MaintenanceResult, error)
 	SoftFactoryReset(context.Context, string) (core.MaintenanceResult, error)
 	SystemLog(context.Context, string, string) (core.SystemLogResult, error)
+	SubscribeEvents(context.Context, string, string) (core.EventSubscription, error)
+	ClockCheck(context.Context, string, string, time.Duration) (core.ClockCheckResult, error)
+	StabilityTest(context.Context, core.StreamSelection, core.StabilityOptions, func(core.StabilityCycle)) (core.StabilityReport, error)
+	BuildReport(context.Context, string, core.ReportOptions) (core.DeviceReport, error)
 	UpdatePreferences(context.Context, core.PreferencesRequest) (core.Overview, error)
 	Close() error
 }
@@ -60,10 +64,12 @@ type LifecycleCloser interface {
 
 // AppDependencies is the explicit Wails-host dependency bundle.
 type AppDependencies struct {
-	Manager         Manager
-	DemoCloser      LifecycleCloser
-	VLC             VLCLauncher
-	PreviewSources  PreviewSourceFactory
+	Manager        Manager
+	DemoCloser     LifecycleCloser
+	VLC            VLCLauncher
+	PreviewSources PreviewSourceFactory
+	// Console, when set, records redacted SOAP exchanges for the Console view.
+	Console         *core.SOAPConsole
 	Demo            bool
 	CallTimeout     time.Duration
 	ShutdownTimeout time.Duration
@@ -82,6 +88,11 @@ type App struct {
 	demoCloser LifecycleCloser
 	vlc        VLCLauncher
 	previews   *previewController
+	console    *core.SOAPConsole
+	// diagnostics holds event feeds, stability jobs, and last results.
+	diagnostics *diagnosticsState
+	// reportDir resolves the folder reports are saved to.
+	reportDir func() (string, error)
 	// files starts the platform file manager for RevealClip.
 	files processStarter
 	caps  CapabilityFlags
@@ -122,13 +133,16 @@ func NewApp(deps AppDependencies) (*App, error) {
 	vlcAvailable := deps.VLC != nil && deps.VLC.Available() && !deps.Demo
 	previews := newPreviewController(deps.PreviewSources, []string{wailsPageOrigin})
 	return &App{
-		rootCtx:    rootCtx,
-		cancel:     cancel,
-		manager:    deps.Manager,
-		demoCloser: deps.DemoCloser,
-		vlc:        deps.VLC,
-		previews:   previews,
-		files:      commandProcessStarter{},
+		rootCtx:     rootCtx,
+		cancel:      cancel,
+		manager:     deps.Manager,
+		demoCloser:  deps.DemoCloser,
+		vlc:         deps.VLC,
+		previews:    previews,
+		console:     deps.Console,
+		diagnostics: newDiagnosticsState(),
+		reportDir:   reportDirectory,
+		files:       commandProcessStarter{},
 		caps: CapabilityFlags{
 			Demo:                  deps.Demo,
 			RTSPPlaybackAvailable: vlcAvailable,

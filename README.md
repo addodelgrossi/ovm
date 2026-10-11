@@ -30,7 +30,9 @@ M1 (ONVIF core and CLI), M2 (media and snapshots), M3 (desktop base), and M4
 (video: RTSP live preview with H.264/H.265, measured statistics, reconnection,
 JPEG fallback, a four-camera grid, clip recording, and the `probe` command) are
 complete, as is M5 (verified camera configuration: encoder, image and IR cut,
-time and NTP, accounts, network, and maintenance). M6 (diagnostics) is next.
+time and NTP, accounts, network, and maintenance). M6 (diagnostics: SOAP
+console, events, clock check, stability test, device reports, Quick Setup, and
+command palette) is implemented and awaiting native validation.
 No physical camera has been verified.
 
 ## Commands
@@ -64,7 +66,31 @@ ovm probe <host> [--profile TOKEN] [--transport tcp|udp] [--duration 30s] \
     [-u user] [--password-env NAME] \
     [--allow-basic [--allow-insecure-basic]] [--allow-legacy-digest] \
     [--timeout duration] [--json]
+
+# Check the camera clock over ONVIF and RTCP, with stated uncertainty.
+ovm clock <host> [--profile TOKEN] [--no-rtcp] [--rtcp-wait 12s] \
+    [-u user] [--password-env NAME] [--timeout duration] [--json]
+
+# Repeated connect-measure-disconnect cycles (release gate: 100 x 20s).
+ovm stability <host> [--profile TOKEN] [--transport tcp|udp] \
+    [--cycles 100] [--duration 20s] [--pause 1s] \
+    [-u user] [--password-env NAME] [--timeout duration] [--json]
+
+# Follow camera events through a PullPoint subscription.
+ovm events <host> [--filter 'tns1:VideoSource//.'] [--duration 30s] \
+    [-u user] [--password-env NAME] [--timeout duration] [--json]
+
+# Write a deterministic, credential-free device report.
+ovm report <host> [--format markdown|json] \
+    [-u user] [--password-env NAME] [--timeout duration] [--json]
 ```
+
+The diagnostic commands accept the same authentication-downgrade flags as
+`info`. `clock` reports each estimate with its uncertainty and a verdict of
+`in_sync`, `out_of_sync`, or `uncertain`; RTCP reflects the system clock only
+when the camera stamps its Sender Reports with it. `stability` writes progress
+to stderr and exits nonzero unless every cycle passed. `report` lists sections
+the camera does not provide instead of failing, and never contains passwords.
 
 `probe` resolves the profile through ONVIF, plays its H.264 or H.265 RTSP
 stream with the same credentials, and reports codec, resolution, frame rate,
@@ -96,7 +122,8 @@ atomic replacement; errors and cancellation leave no partial output.
 
 `info` human output includes operation support, identity, time, hostname,
 capability/service endpoints, scopes, and network interfaces. Machine output
-for `discover`, `info`, `profiles`, `snapshot`, and `probe` uses a stable
+for `discover`, `info`, `profiles`, `snapshot`, `probe`, `clock`, `stability`,
+`events`, and `report` uses a stable
 `schema_version: 1` typed envelope; runtime and validation failures retain the
 command's envelope with a safe categorized `error` object and return a nonzero
 exit code.

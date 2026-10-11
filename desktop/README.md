@@ -31,6 +31,14 @@ remuxes it to fragmented MP4, and serves it to the WebView through the
 token-protected loopback bridge in `internal/preview`. Clips are saved to
 `~/Movies/ovm` on macOS and `~/Videos/ovm` elsewhere.
 
+The Diagnostics tab (⌘5) saves device reports as Markdown and JSON to
+`~/Documents/ovm`, runs the clock check and the stability test, follows camera
+events, and shows the SOAP console. Event feeds and stability tests run in the
+background, are polled by identifier, and are cancelled and drained at
+shutdown. Quick Setup (password, H.264, IR day mode, NTP) remembers its
+progress per device, and ⌘/Ctrl+K opens the command palette. In demo mode the
+camera publishes synthetic motion and digital-input events.
+
 The Wails facade owns a root context and bounds every backend operation. Its
 exported device methods return result/error envelopes with a stable
 `BindingError` (`category`, `code`, and safe English `message`). Authentication

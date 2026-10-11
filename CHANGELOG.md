@@ -153,6 +153,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The demo camera accepts encoder changes in both codecs (its stream follows
   the configured codec), offers Imaging, and reboots for a few seconds.
 
+- Diagnostics (M6): a bounded, in-memory SOAP console that shows redacted
+  request and response envelopes (passwords, nonces, user names, and URL
+  credentials removed; 64 KiB per body; capture off by default).
+- ONVIF Events: a typed PullPoint client (`CreatePullPointSubscription`,
+  `PullMessages`, `Renew`, `Unsubscribe`) with WS-Addressing headers, echoed
+  simple reference parameters, same-origin subscription addresses, optional
+  ConcreteSet topic filters, and bounded, sanitized messages.
+- Hybrid clock sync check: the best of several ONVIF clock reads (whole-second
+  quantization stated as ±0.5 s plus half the round trip) combined with the
+  RTCP Sender Report clock of a stream; the verdict is `in_sync`,
+  `out_of_sync`, or `uncertain` when the interval straddles the ±2 s tolerance.
+- Stability test: repeated connect-measure-disconnect cycles with per-cycle
+  pass/fail, time to first frame (min/median/max), frame rate, bitrate, and
+  packet loss; the release gate preset is 100 × 20 s.
+- Deterministic, credential-free device reports in JSON
+  (`ovm.device-report/v1`) and Markdown covering identity, profiles, image,
+  time, network, accounts, and the session's clock and stability results;
+  sections a camera does not provide are listed instead of failing the report.
+- CLI: `ovm clock`, `ovm stability`, `ovm events`, and `ovm report`, with the
+  shared credential, timeout, and `schema_version: 1` JSON envelope policy.
+- Desktop Diagnostics tab (⌘5) with report export (Markdown and JSON in
+  `~/Documents/ovm`, copy and show in folder), clock check, stability test,
+  live event feed with text filter, and the SOAP console; a resumable Quick
+  Setup (password, H.264 on every profile, IR day mode, NTP); and a keyboard
+  command palette (⌘/Ctrl+K).
+- The demo camera advertises Events and publishes a synthetic motion alarm and
+  digital input; its RTSP stream carries RTCP Sender Reports.
+
 ### Changed
 
 - The fake device publishes configuration as atomic versions, models
@@ -276,5 +304,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 
 - M0 through M5 are complete, validated locally, in remote CI, and (for M3,
-  M4, and M5) in the native macOS app in demo mode. No physical camera has been
+  M4, and M5) in the native macOS app in demo mode. M6 is implemented and
+  passes local CI; native validation is pending. No physical camera has been
   verified, and no hardware or conformance claim is made.

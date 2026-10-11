@@ -111,6 +111,37 @@ XML, or UI types.
   fragment components; URI paths and opaque identity content are intentionally
   preserved and are not claimed to be secret-free.
 
+## M6 diagnostics boundaries
+
+- SOAP console: `soap.Config{Trace, TraceBodies}` hands each exchange to a
+  trace hook after `RedactXML` removes Password, Username, and Nonce content
+  and bodies are capped at 64 KiB. `app.SOAPConsole` keeps the newest 500
+  entries in memory only, records nothing until enabled, and clears on
+  disable. One console is shared by every production adapter through
+  `ProductionOptions` and `ProductionUseCases`.
+- Events: `pkg/onvif/events` addresses subscription operations with
+  WS-Addressing To/Action and re-serializes only simple-text reference
+  parameters, so camera XML is never copied into a request. The app rejects a
+  service or subscription address that is not same-origin with the camera.
+  `EventSubscription.Pull` renews every 30 s for a 60 s termination. The
+  desktop owns the long-running feed (`beginBackground`, drained at shutdown),
+  resubscribes after failures, and stops after five consecutive ones.
+- Clock check: ONVIF samples take the shortest round trip; RTCP uses the
+  newest Sender Report from `stream.RTSPSource.SenderClock`, bracketing the
+  unknown one-way delay with the ONVIF round trip. The verdict uses the most
+  precise estimate and is `uncertain` whenever its interval straddles the
+  tolerance.
+- Stability: `RunStability` drives any probe function, so the Manager
+  (desktop) and `HostDiagnostics` (CLI) share one implementation. Desktop runs
+  are background jobs polled by identifier.
+- Reports: `buildReport` reads every section independently and records gaps;
+  output is sorted and contains only DTOs that never carry credentials. The
+  desktop writes `0600` files with exclusive create in `~/Documents/ovm` and
+  reveals only files matching the report name pattern in that folder.
+- Quick Setup and the command palette are frontend compositions of existing
+  bindings; Quick Setup progress is a per-device `localStorage` convenience,
+  and the camera remains the source of truth.
+
 ## M5 configuration boundaries
 
 - Each configuration use case (`EncoderUseCase`, `ImagingUseCase`,

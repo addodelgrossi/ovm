@@ -441,3 +441,21 @@ func TestEventsDeliverSyntheticMotion(t *testing.T) {
 	}
 	t.Fatal("no motion event before the deadline")
 }
+
+// TestClockCheckCombinesONVIFAndRTCP measures the demo camera clock, which is
+// this computer's clock, through both paths.
+func TestClockCheckCombinesONVIFAndRTCP(t *testing.T) {
+	env := newTestEnvironment(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+	result, err := env.Manager().ClockCheck(ctx, env.DeviceID(), "profile_main", 15*time.Second)
+	if err != nil {
+		t.Fatalf("ClockCheck() error = %v", err)
+	}
+	if result.ONVIF == nil || result.RTCP == nil {
+		t.Fatalf("ClockCheck() = %+v", result)
+	}
+	if result.Verdict != app.ClockInSync || result.RTCP.UncertaintySeconds >= result.ONVIF.UncertaintySeconds {
+		t.Fatalf("verdict = %q, onvif = %+v, rtcp = %+v", result.Verdict, result.ONVIF, result.RTCP)
+	}
+}

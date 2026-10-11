@@ -153,5 +153,6 @@ func ProductionUseCases(options ProductionOptions) ManagerDependencies {
 		Network:       services,
 		Maintenance:   services,
 		Events:        services,
+		Clock:         services,
 	}
 }

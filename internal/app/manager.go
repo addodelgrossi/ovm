@@ -70,6 +70,7 @@ type Manager struct {
 	network     NetworkUseCase
 	maintenance MaintenanceUseCase
 	events      EventsUseCase
+	clockCheck  ClockUseCase
 
 	mu sync.Mutex
 	// activeScan is the single in-flight scan's tracked cancel, if any.
@@ -117,6 +118,8 @@ type ManagerDependencies struct {
 	Maintenance MaintenanceUseCase
 	// Events subscribes to camera events. It is optional.
 	Events EventsUseCase
+	// Clock measures the camera clock. It is optional.
+	Clock ClockUseCase
 }
 
 // NewManager constructs a Manager from fully injected dependencies. It returns
@@ -143,6 +146,7 @@ func NewManager(deps ManagerDependencies) (*Manager, error) {
 		network:       deps.Network,
 		maintenance:   deps.Maintenance,
 		events:        deps.Events,
+		clockCheck:    deps.Clock,
 		deviceOps:     make(map[string]*trackedCancel),
 		statuses:      make(map[string]DeviceRuntimeStatus),
 	}, nil

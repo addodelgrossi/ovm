@@ -25,6 +25,8 @@ type Dependencies struct {
 	Snapshot app.SnapshotUseCase
 	// Probe measures a stream for a fixed duration. Required for probe.
 	Probe app.ProbeUseCase
+	// Diagnostics backs the clock, events, and report commands.
+	Diagnostics app.HostDiagnostics
 	// LookupEnv resolves environment variables for credential input. A nil
 	// value defaults to os.LookupEnv.
 	LookupEnv func(name string) (string, bool)
@@ -39,6 +41,7 @@ func Default() Dependencies {
 		MediaProfiles: app.NewProductionMediaProfiles(),
 		Snapshot:      app.NewProductionSnapshot(),
 		Probe:         app.NewProductionProbe(),
+		Diagnostics:   app.NewProductionHostDiagnostics(),
 		LookupEnv:     nil,
 	}
 }
@@ -82,6 +85,11 @@ func NewRootCommand(info buildinfo.Info, deps Dependencies, rawArgs ...[]string)
 	root.AddCommand(newProfilesCommand(deps.MediaProfiles, deps.LookupEnv, detectJSONIntent(arguments, "profiles", "--user", "-u", "--password-env", "--timeout")))
 	root.AddCommand(newProbeCommand(deps.Probe, deps.LookupEnv, detectJSONIntent(arguments, "probe", "--user", "-u", "--password-env", "--profile", "--transport", "--duration", "--timeout")))
 	root.AddCommand(newSnapshotCommand(deps.Snapshot, deps.LookupEnv, detectJSONIntent(arguments, "snapshot", "--user", "-u", "--password-env", "--profile", "--output", "-o", "--timeout")))
+	credentialFlags := []string{"--user", "-u", "--password-env", "--timeout"}
+	root.AddCommand(newClockCommand(deps.Diagnostics, deps.LookupEnv, detectJSONIntent(arguments, "clock", append(credentialFlags, "--profile", "--rtcp-wait")...)))
+	root.AddCommand(newStabilityCommand(deps.Probe, deps.LookupEnv, detectJSONIntent(arguments, "stability", append(credentialFlags, "--profile", "--transport", "--cycles", "--duration", "--pause")...)))
+	root.AddCommand(newEventsCommand(deps.Diagnostics, deps.LookupEnv, detectJSONIntent(arguments, "events", append(credentialFlags, "--filter", "--duration")...)))
+	root.AddCommand(newReportCommand(deps.Diagnostics, info, deps.LookupEnv, detectJSONIntent(arguments, "report", append(credentialFlags, "--format")...)))
 	return root
 }
 

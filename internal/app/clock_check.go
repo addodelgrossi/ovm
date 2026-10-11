@@ -173,10 +173,17 @@ func (m *Manager) rtcpClock(ctx context.Context, deviceID, profileToken string, 
 	if profileToken == "" || m.liveStreams == nil {
 		return nil, "no stream was selected"
 	}
+	return measureRTCP(ctx, wait, onvif, func(ctx context.Context) (stream.LiveSource, error) {
+		return m.OpenLiveStream(ctx, StreamSelection{DeviceID: deviceID, ProfileToken: profileToken, Transport: StreamTransportTCP})
+	})
+}
+
+// measureRTCP opens a stream and waits for its first Sender Report.
+func measureRTCP(ctx context.Context, wait time.Duration, onvif *ClockEstimate, open func(ctx context.Context) (stream.LiveSource, error)) (*ClockEstimate, string) {
 	if wait <= 0 {
 		wait = DefaultRTCPWait
 	}
-	source, err := m.OpenLiveStream(ctx, StreamSelection{DeviceID: deviceID, ProfileToken: profileToken, Transport: StreamTransportTCP})
+	source, err := open(ctx)
 	if err != nil {
 		return nil, "the stream could not be opened"
 	}

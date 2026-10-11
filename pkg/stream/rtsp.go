@@ -15,6 +15,7 @@ import (
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/format"
 	"github.com/bluenviron/gortsplib/v5/pkg/liberrors"
+	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 )
 
@@ -78,6 +79,8 @@ type RTSPSource struct {
 	lost *lossCounter
 
 	mu        sync.Mutex
+	sender    SenderClock
+	hasSender bool
 	err       error
 	dropping  bool
 	closeOnce sync.Once
@@ -204,6 +207,11 @@ func setupVideo(client *gortsplib.Client, target *base.URL, loss *lossCounter) (
 	client.OnPacketRTP(media, forma, func(packet *rtp.Packet) {
 		source.handlePacket(media, decoder, packet)
 	})
+	client.OnPacketRTCP(media, func(packet rtcp.Packet) {
+		if report, ok := packet.(*rtcp.SenderReport); ok {
+			source.recordSenderReport(report.NTPTime, time.Now())
+		}
+	})
 	if _, err := client.Play(nil); err != nil {
 		return nil, classifyRTSPError(err)
 	}
@@ -259,6 +267,41 @@ func (s *RTSPSource) ReadAccessUnit(ctx context.Context) ([][]byte, time.Duratio
 		defer s.mu.Unlock()
 		return nil, 0, s.err
 	}
+}
+
+// SenderClock is the newest RTCP Sender Report wall-clock sample: the
+// camera's NTP timestamp and the local time the report arrived. Cameras
+// usually derive it from their system clock, but this is not guaranteed.
+type SenderClock struct {
+	CameraTime time.Time
+	ReceivedAt time.Time
+}
+
+// ntpEpochOffset is the number of seconds from 1900-01-01 to 1970-01-01.
+const ntpEpochOffset = 2208988800
+
+// ntpToTime converts a 64-bit NTP timestamp to a time.
+func ntpToTime(ntp uint64) time.Time {
+	seconds := int64(ntp>>32) - ntpEpochOffset
+	nanos := (int64(ntp&0xffffffff) * int64(time.Second)) >> 32
+	return time.Unix(seconds, nanos).UTC()
+}
+
+func (s *RTSPSource) recordSenderReport(ntp uint64, received time.Time) {
+	if ntp == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sender = SenderClock{CameraTime: ntpToTime(ntp), ReceivedAt: received}
+	s.hasSender = true
+}
+
+// SenderClock returns the newest RTCP Sender Report sample, if any arrived.
+func (s *RTSPSource) SenderClock() (SenderClock, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sender, s.hasSender
 }
 
 // LostPackets reports RTP packets the client detected as lost.
